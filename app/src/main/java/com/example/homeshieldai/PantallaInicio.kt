@@ -1,8 +1,10 @@
 package com.example.homeshieldai
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -21,7 +23,7 @@ import java.util.Locale
 import androidx.compose.ui.graphics.Color
 
 @Composable
-fun PantallaInicio(estado: EstadoSistema, onVerAlertas: () -> Unit) {
+fun PantallaInicio(estado: EstadoSistema, onVerAlertas: () -> Unit, onCuenta: () -> Unit) {
     val (textoSala, colorSala) = estadoTemp(estado.tempSala, estado.tempAlerta)
     val (textoTablero, colorTablero) = estadoTemp(estado.tempTablero, estado.tempAlerta)
 
@@ -32,7 +34,7 @@ fun PantallaInicio(estado: EstadoSistema, onVerAlertas: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Encabezado()
+        Encabezado(estado.nombre.take(1).uppercase(), onCuenta)
         TarjetaProtegida(estado.emergencia, onVerAlertas)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             TarjetaSensor("Sala", "%.1f °C".format(Locale.US, estado.tempSala),
@@ -144,7 +146,7 @@ fun TarjetaRele(estado: EstadoSistema) {
 }
 
 @Composable
-fun Encabezado() {
+fun Encabezado(inicial: String, onCuenta: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Filled.Home, null, tint = Menta, modifier = Modifier.size(38.dp))
         Spacer(Modifier.width(10.dp))
@@ -158,6 +160,17 @@ fun Encabezado() {
         }
         BadgedBox(badge = { Badge(containerColor = Menta) }) {
             Icon(Icons.Filled.Notifications, "Notificaciones", tint = TextoSecundario)
+        }
+        Spacer(Modifier.width(14.dp))
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(MentaOscuro)
+                .clickable { onCuenta() },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(inicial, style = MaterialTheme.typography.titleMedium)
         }
     }
 }

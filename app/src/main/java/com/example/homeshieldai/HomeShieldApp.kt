@@ -1,5 +1,9 @@
 package com.example.homeshieldai
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,30 +20,20 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.homeshieldai.ui.theme.Fondo
-import com.example.homeshieldai.ui.theme.FondoAlto
-import com.example.homeshieldai.ui.theme.Menta
-import com.example.homeshieldai.ui.theme.MentaOscuro
-import com.example.homeshieldai.ui.theme.Superficie
-import com.example.homeshieldai.ui.theme.TextoPrincipal
-import com.example.homeshieldai.ui.theme.TextoSecundario
-import android.Manifest
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.platform.LocalContext
+import com.example.homeshieldai.ui.theme.*
 
 data class Destino(val ruta: String, val titulo: String, val icono: ImageVector)
 
@@ -52,8 +46,16 @@ val destinos = listOf(
 
 @Composable
 fun HomeShieldApp() {
-    val navController = rememberNavController()
     val estado = remember { EstadoSistema() }
+    if (estado.sesionIniciada) AppPrincipal(estado) else PantallaLogin(estado)
+}
+
+@Composable
+fun AppPrincipal(estado: EstadoSistema) {
+    val navController = rememberNavController()
+    val entradaActual by navController.currentBackStackEntryAsState()
+    val rutaActual = entradaActual?.destination?.route
+
     val context = LocalContext.current
     val lanzadorPermiso = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -66,8 +68,6 @@ fun HomeShieldApp() {
             lanzadorPermiso.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
-    val entradaActual by navController.currentBackStackEntryAsState()
-    val rutaActual = entradaActual?.destination?.route
 
     Box(
         modifier = Modifier
@@ -95,11 +95,18 @@ fun HomeShieldApp() {
                 modifier = Modifier.padding(padding)
             ) {
                 composable("inicio") {
-                    PantallaInicio(estado) { navController.navigate("alertas") }
+                    PantallaInicio(
+                        estado,
+                        onVerAlertas = { navController.navigate("alertas") },
+                        onCuenta = { navController.navigate("cuenta") }
+                    )
                 }
                 composable("consumo") { PantallaConsumo(estado) }
                 composable("alertas") { PantallaAlertas(estado) }
                 composable("ajustes") { PantallaAjustes(estado) }
+                composable("cuenta") {
+                    PantallaCuenta(estado) { navController.popBackStack() }
+                }
             }
         }
     }
