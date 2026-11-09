@@ -100,11 +100,12 @@ fun PantallaLogin(estado: EstadoSistema) {
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(FondoAlto, Fondo)))
     ) {
+        val brillo = Menta.copy(alpha = 0.22f)
         Canvas(Modifier.fillMaxSize()) {
             val centro = Offset(size.width / 2, 0f)
             drawCircle(
                 brush = Brush.radialGradient(
-                    listOf(Menta.copy(alpha = 0.22f), Color.Transparent),
+                    listOf(brillo, Color.Transparent),
                     center = centro, radius = size.width * 1.1f
                 ),
                 radius = size.width * 1.1f, center = centro

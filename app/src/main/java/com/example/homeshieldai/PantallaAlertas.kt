@@ -22,40 +22,85 @@ import com.example.homeshieldai.ui.theme.*
 
 enum class Categoria { TEMPERATURA, ELECTRICA, GENERAL }
 
+
+enum class Tono { NORMAL, PRECAUCION, PELIGRO, INFO }
+
+@Composable
+fun Tono.color(): Color = when (this) {
+    Tono.NORMAL -> Menta
+    Tono.PRECAUCION -> Ambar
+    Tono.PELIGRO -> Peligro
+    Tono.INFO -> Info
+}
+
 data class Alerta(
     val titulo: String,
     val mensaje: String,
     val tiempo: String,
     val categoria: Categoria,
-    val color: Color,
+    val tono: Tono,
     val icono: ImageVector
 )
 
 val alertasIniciales = listOf(
+
     Alerta(
         "Temperatura alta",
         "El tablero eléctrico superó los 35 °C (38.0 °C).",
-        "Hace 10 min", Categoria.TEMPERATURA, Ambar, Icons.Filled.Thermostat
+        "Hace 10 min", Categoria.TEMPERATURA, Tono.PRECAUCION, Icons.Filled.Thermostat
     ),
     Alerta(
         "Consumo elevado",
         "Estás al 80% de tu límite mensual de electricidad.",
-        "Hace 1 h", Categoria.ELECTRICA, Ambar, Icons.Filled.Bolt
+        "Hace 1 h", Categoria.ELECTRICA, Tono.PRECAUCION, Icons.Filled.Bolt
     ),
     Alerta(
         "Sistema normal",
         "Las mediciones se encuentran dentro de los rangos configurados.",
-        "Hace 2 h", Categoria.GENERAL, Menta, Icons.Filled.CheckCircle
+        "Hace 2 h", Categoria.GENERAL, Tono.NORMAL, Icons.Filled.CheckCircle
     ),
     Alerta(
         "Conexión restablecida",
         "El dispositivo volvió a conectarse correctamente.",
-        "Ayer, 18:30", Categoria.GENERAL, Info, Icons.Filled.Info
+        "Ayer, 18:30", Categoria.GENERAL, Tono.INFO, Icons.Filled.Info
     )
 )
-
 val filtros = listOf("Todas", "Temperatura", "Eléctrica")
 
+@Composable
+fun TarjetaAlerta(alerta: Alerta) {
+    val color = alerta.tono.color()
+    TarjetaVidrio(
+        modifier = Modifier.fillMaxWidth(),
+        colorBorde = color.copy(alpha = 0.55f),
+        fondo = Brush.verticalGradient(
+            listOf(color.copy(alpha = 0.20f), color.copy(alpha = 0.06f))
+        )
+    ) {
+        Row(verticalAlignment = Alignment.Top) {
+            Icon(alerta.icono, null, tint = color, modifier = Modifier.size(32.dp))
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        alerta.titulo,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = color,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        alerta.tiempo,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextoSecundario
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(alerta.mensaje, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+}
 @Composable
 fun PantallaAlertas(estado: EstadoSistema) {
     var filtro by remember { mutableIntStateOf(0) }
@@ -111,39 +156,5 @@ fun ChipFiltro(texto: String, activo: Boolean, modifier: Modifier = Modifier, on
             style = MaterialTheme.typography.labelLarge,
             color = if (activo) Fondo else TextoPrincipal
         )
-    }
-}
-
-@Composable
-fun TarjetaAlerta(alerta: Alerta) {
-    TarjetaVidrio(
-        modifier = Modifier.fillMaxWidth(),
-        colorBorde = alerta.color.copy(alpha = 0.55f),
-        fondo = Brush.verticalGradient(
-            listOf(alerta.color.copy(alpha = 0.20f), alerta.color.copy(alpha = 0.06f))
-        )
-    ) {
-        Row(verticalAlignment = Alignment.Top) {
-            Icon(alerta.icono, null, tint = alerta.color, modifier = Modifier.size(32.dp))
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        alerta.titulo,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = alerta.color,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        alerta.tiempo,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextoSecundario
-                    )
-                }
-                Spacer(Modifier.height(4.dp))
-                Text(alerta.mensaje, style = MaterialTheme.typography.bodyMedium)
-            }
-        }
     }
 }

@@ -13,6 +13,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.example.homeshieldai.ui.theme.*
 import java.util.Locale
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 
 @Composable
 fun PantallaAjustes(estado: EstadoSistema) {
@@ -76,6 +81,24 @@ fun PantallaAjustes(estado: EstadoSistema) {
                     )
                 )
             }
+        }
+
+        TituloSeccion("Apariencia")
+        TarjetaVidrio(modifier = Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Palette, null, tint = Menta)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Tema de la app", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Automático sigue el modo de tu celular.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextoSecundario
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            SelectorTema(estado.modoTema) { estado.cambiarTema(it) }
         }
 
         TituloSeccion("Reactivación del sistema")
@@ -197,5 +220,35 @@ fun FilaSlider(
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(etiquetaMin, style = MaterialTheme.typography.bodyMedium, color = TextoSecundario)
         Text(etiquetaMax, style = MaterialTheme.typography.bodyMedium, color = TextoSecundario)
+    }
+}
+
+@Composable
+fun SelectorTema(actual: ModoTema, onCambio: (ModoTema) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(50))
+            .background(Fondo.copy(alpha = 0.5f))
+            .padding(4.dp)
+    ) {
+        ModoTema.values().forEach { modo ->
+            val activo = modo == actual
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(50))
+                    .background(if (activo) Menta else Color.Transparent)
+                    .clickable { onCambio(modo) }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    modo.etiqueta,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (activo) Fondo else TextoPrincipal
+                )
+            }
+        }
     }
 }

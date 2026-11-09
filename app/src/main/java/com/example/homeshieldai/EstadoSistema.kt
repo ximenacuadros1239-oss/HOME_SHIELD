@@ -30,6 +30,8 @@ import com.google.firebase.auth.PhoneAuthCredential
 import com.google.firebase.auth.PhoneAuthOptions
 import com.google.firebase.auth.PhoneAuthProvider
 import java.util.concurrent.TimeUnit
+import androidx.compose.runtime.Composable
+import com.example.homeshieldai.ui.theme.ModoTema
 
 class EstadoSistema {
     private val auth = FirebaseAuth.getInstance()
@@ -56,6 +58,13 @@ class EstadoSistema {
     var limiteCorriente by mutableFloatStateOf(16f)
     var presupuesto by mutableFloatStateOf(80f)
     var notificaciones by mutableStateOf(true)
+    var modoTema by mutableStateOf(ModoTema.SISTEMA)
+    var alCambiarTema: ((ModoTema) -> Unit)? = null
+
+    fun cambiarTema(modo: ModoTema) {
+        modoTema = modo
+        alCambiarTema?.invoke(modo)
+    }
 
     var alAlerta: ((String) -> Unit)? = null
 
@@ -241,7 +250,7 @@ class EstadoSistema {
                     "Posible cortocircuito",
                     "Se detectó un consumo anormal (%.1f A). El relé se apagó por seguridad."
                         .format(Locale.US, nuevaCorriente),
-                    "Ahora", Categoria.ELECTRICA, Peligro, Icons.Filled.Bolt
+                    "Ahora", Categoria.ELECTRICA, Tono.PELIGRO, Icons.Filled.Bolt
                 )
             )
             if (notificaciones) {
@@ -263,12 +272,13 @@ class EstadoSistema {
             Alerta(
                 "Sistema rearmado",
                 "El sistema volvió a operar. Enciende el relé cuando estés listo.",
-                "Ahora", Categoria.GENERAL, Info, Icons.Filled.Info
+                "Ahora", Categoria.GENERAL, Tono.INFO, Icons.Filled.Info
             )
         )
     }
 }
 
+@Composable
 fun estadoTemp(temp: Float, alerta: Float): Pair<String, Color> = when {
     temp >= alerta -> "Peligro" to Peligro
     temp >= alerta - 2f -> "Precaución" to Ambar

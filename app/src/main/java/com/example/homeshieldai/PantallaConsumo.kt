@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.homeshieldai.ui.theme.*
 import java.util.Locale
-
+import androidx.compose.ui.graphics.Color
 data class Periodo(
     val nombre: String,
     val gasto: Double,
@@ -166,22 +166,20 @@ fun Pestanas(seleccionado: Int, onSeleccionar: (Int) -> Unit) {
 fun DialPresupuesto(gasto: Double, limite: Double) {
     val porcentaje = (gasto / limite).toFloat().coerceIn(0f, 1f)
     val animado by animateFloatAsState(porcentaje, tween(800), label = "dial")
+    val colorPista = SuperficieAlta
+    val colorFin = Menta
+    val colorInicio = Menta.copy(alpha = 0.45f)
 
     Box(modifier = Modifier.size(220.dp), contentAlignment = Alignment.Center) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val grosor = 18.dp.toPx()
-            val arco = Size(size.width - grosor, size.height - grosor)
-            val origen = Offset(grosor / 2, grosor / 2)
-            drawArc(
-                color = SuperficieAlta, startAngle = -90f, sweepAngle = 360f,
-                useCenter = false, topLeft = origen, size = arco,
-                style = Stroke(width = grosor)
-            )
-            drawArc(
-                brush = Brush.sweepGradient(listOf(MentaOscuro, Menta)),
-                startAngle = -90f, sweepAngle = 360f * animado,
-                useCenter = false, topLeft = origen, size = arco,
-                style = Stroke(width = grosor, cap = StrokeCap.Round)
+        val brillo = Menta.copy(alpha = 0.22f)
+        Canvas(Modifier.fillMaxSize()) {
+            val centro = Offset(size.width / 2, 0f)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    listOf(brillo, Color.Transparent),
+                    center = centro, radius = size.width * 1.1f
+                ),
+                radius = size.width * 1.1f, center = centro
             )
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {

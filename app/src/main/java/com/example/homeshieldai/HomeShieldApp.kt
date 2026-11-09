@@ -46,8 +46,16 @@ val destinos = listOf(
 
 @Composable
 fun HomeShieldApp() {
-    val estado = remember { EstadoSistema() }
-    if (estado.sesionIniciada) AppPrincipal(estado) else PantallaLogin(estado)
+    val context = LocalContext.current
+    val estado = remember {
+        EstadoSistema().also { e ->
+            e.modoTema = leerModoTema(context)
+            e.alCambiarTema = { guardarModoTema(context, it) }
+        }
+    }
+    HomeShieldAITheme(estado.modoTema) {
+        if (estado.sesionIniciada) AppPrincipal(estado) else PantallaLogin(estado)
+    }
 }
 
 @Composable
