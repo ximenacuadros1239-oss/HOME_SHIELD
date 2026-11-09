@@ -21,6 +21,7 @@ import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.auth.UserProfileChangeRequest
 import java.util.Locale
+import com.google.firebase.auth.GoogleAuthProvider
 
 class EstadoSistema {
     private val auth = FirebaseAuth.getInstance()
@@ -64,6 +65,18 @@ class EstadoSistema {
     fun iniciarSesion(correo: String, clave: String, onError: (String) -> Unit) {
         cargando = true
         auth.signInWithEmailAndPassword(correo, clave).addOnCompleteListener { tarea ->
+            cargando = false
+            if (tarea.isSuccessful) {
+                cargarUsuario()
+                sesionIniciada = true
+            } else onError(mensajeError(tarea.exception))
+        }
+    }
+
+    fun entrarConGoogle(idToken: String, onError: (String) -> Unit) {
+        cargando = true
+        val credencial = GoogleAuthProvider.getCredential(idToken, null)
+        auth.signInWithCredential(credencial).addOnCompleteListener { tarea ->
             cargando = false
             if (tarea.isSuccessful) {
                 cargarUsuario()

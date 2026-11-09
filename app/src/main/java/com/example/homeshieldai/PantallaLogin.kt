@@ -20,6 +20,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.homeshieldai.ui.theme.*
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 
 @Composable
 fun PantallaLogin(estado: EstadoSistema) {
@@ -30,6 +32,9 @@ fun PantallaLogin(estado: EstadoSistema) {
     var verClave by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var info by remember { mutableStateOf<String?>(null) }
+
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     val colores = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = Menta,
@@ -155,6 +160,32 @@ fun PantallaLogin(estado: EstadoSistema) {
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Text("o", color = TextoSecundario, style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = {
+                    error = null
+                    info = null
+                    scope.launch {
+                        when (val r = pedirTokenGoogle(context)) {
+                            is ResultadoGoogle.Token ->
+                                estado.entrarConGoogle(r.idToken) { error = it }
+                            is ResultadoGoogle.Error -> error = r.mensaje
+                            ResultadoGoogle.Cancelado -> Unit
+                        }
+                    }
+                },
+                enabled = !estado.cargando,
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Borde),
+                modifier = Modifier.fillMaxWidth().height(52.dp)
+            ) {
+                Icon(Icons.Filled.AccountCircle, null, tint = Menta)
+                Spacer(Modifier.width(10.dp))
+                Text("Continuar con Google", color = TextoPrincipal, style = MaterialTheme.typography.titleMedium)
             }
 
             if (!modoRegistro) {
