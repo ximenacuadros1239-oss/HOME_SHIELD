@@ -22,6 +22,14 @@ import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.auth.UserProfileChangeRequest
 import java.util.Locale
 import com.google.firebase.auth.GoogleAuthProvider
+import android.app.Activity
+import com.google.firebase.FirebaseException
+import com.google.firebase.FirebaseTooManyRequestsException
+import com.google.firebase.auth.AuthCredential
+import com.google.firebase.auth.PhoneAuthCredential
+import com.google.firebase.auth.PhoneAuthOptions
+import com.google.firebase.auth.PhoneAuthProvider
+import java.util.concurrent.TimeUnit
 
 class EstadoSistema {
     private val auth = FirebaseAuth.getInstance()
@@ -32,6 +40,9 @@ class EstadoSistema {
     var correo by mutableStateOf("")
     var nombreHogar by mutableStateOf("Mi casa")
     var cargando by mutableStateOf(false)
+    var codigoEnviado by mutableStateOf(false)
+    private var verificationId: String? = null
+    private var tokenReenvio: PhoneAuthProvider.ForceResendingToken? = null
 
     // Lecturas
     var tempSala by mutableFloatStateOf(24.5f)
@@ -57,9 +68,10 @@ class EstadoSistema {
 
     fun cargarUsuario() {
         val u = auth.currentUser
-        correo = u?.email ?: ""
+        correo = u?.email ?: u?.phoneNumber ?: ""
         nombre = u?.displayName?.takeIf { it.isNotBlank() }
-            ?: (u?.email?.substringBefore("@") ?: "")
+            ?: u?.email?.substringBefore("@")
+                    ?: if (u?.phoneNumber != null) "Usuario" else ""
     }
 
     fun iniciarSesion(correo: String, clave: String, onError: (String) -> Unit) {
@@ -83,6 +95,84 @@ class EstadoSistema {
                 sesionIniciada = true
             } else onError(mensajeError(tarea.exception))
         }
+    }
+
+    fun enviarCodigo(
+        activity: Activity,
+        telefono: String,
+        reenviar: Boolean,
+        onError: (String) -> Unit
+    ) {
+        cargando = true
+        val callbacks = object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
+            override fun onVerificationCompleted(credencial: PhoneAuthCredential) {
+                entrarConCredencial(credencial, false, onError)
+            }
+
+            override fun onVerificationFailed(e: FirebaseException) {
+                cargando = false
+                onError(mensajeTelefono(e))
+            }
+
+            override fun onCodeSent(id: String, token: PhoneAuthProvider.ForceResendingToken) {
+                cargando = false
+                verificationId = id
+                tokenReenvio = token
+                codigoEnviado = true
+            }
+        }
+        val opciones = PhoneAuthOptions.newBuilder(auth)
+            .setPhoneNumber(telefono)
+            .setTimeout(60L, TimeUnit.SECONDS)
+            .setActivity(activity)
+            .setCallbacks(callbacks)
+        if (reenviar) tokenReenvio?.let { opciones.setForceResendingToken(it) }
+        PhoneAuthProvider.verifyPhoneNumber(opciones.build())
+    }
+
+    fun verificarCodigo(codigo: String, onError: (String) -> Unit) {
+        val id = verificationId
+        if (id == null) {
+            onError("Solicita primero el código")
+            return
+        }
+        entrarConCredencial(PhoneAuthProvider.getCredential(id, codigo), true, onError)
+    }
+
+    fun reiniciarTelefono() {
+        codigoEnviado = false
+        verificationId = null
+        tokenReenvio = null
+    }
+
+    private fun entrarConCredencial(
+        credencial: AuthCredential,
+        esCodigo: Boolean,
+        onError: (String) -> Unit
+    ) {
+        cargando = true
+        auth.signInWithCredential(credencial).addOnCompleteListener { tarea ->
+            cargando = false
+            if (tarea.isSuccessful) {
+                cargarUsuario()
+                codigoEnviado = false
+                sesionIniciada = true
+            } else {
+                val e = tarea.exception
+                onError(
+                    if (esCodigo && e is FirebaseAuthInvalidCredentialsException)
+                        "Código incorrecto o vencido"
+                    else mensajeError(e)
+                )
+            }
+        }
+    }
+
+    private fun mensajeTelefono(e: FirebaseException): String = when (e) {
+        is FirebaseAuthInvalidCredentialsException -> "El número de teléfono no es válido"
+        is FirebaseTooManyRequestsException -> "Se superó el límite de SMS. Intenta más tarde"
+        is FirebaseNetworkException -> "Sin conexión a internet"
+        else -> "No se pudo enviar el código: ${e.message}"
     }
 
     fun crearCuenta(nombre: String, correo: String, clave: String, onError: (String) -> Unit) {
