@@ -67,7 +67,6 @@ class EstadoSistema {
     var voltaje by mutableFloatStateOf(221f)
     var potencia by mutableFloatStateOf(126f)
     var energiaHoy by mutableFloatStateOf(3.8f)
-    var releEncendido by mutableStateOf(true)
     var emergencia by mutableStateOf(false)
     var rearmePendiente by mutableStateOf(false)
     var dispositivoConectado by mutableStateOf(true)
@@ -79,27 +78,16 @@ class EstadoSistema {
     val histTablero = mutableStateListOf<Float>()
     val histPotencia = mutableStateListOf<Float>()
 
-    private fun registrarHistorial() {
-        fun agregar(lista: MutableList<Float>, valor: Float) {
-            lista.add(valor)
-            if (lista.size > 60) lista.removeAt(0)
-        }
-        agregar(histSala, tempSala)
-        agregar(histTablero, tempTablero)
-        agregar(histPotencia, potencia)
-    }
+    // ---------- Dispositivos controlables ----------
+    val dispositivos = mutableStateListOf(
+        Dispositivo(1, "Estufa", TipoDispositivo.ESTUFA, 1, 1500, true),
+        Dispositivo(2, "Ventilador", TipoDispositivo.VENTILADOR, 2, 60, false)
+    )
+    private var proximoId = 3
 
-    init {
-        var s = tempSala
-        var t = tempTablero
-        repeat(40) {
-            s = (s + Random.nextFloat() * 0.4f - 0.2f).coerceIn(22f, 27f)
-            t = (t + Random.nextFloat() * 0.6f - 0.3f).coerceIn(29f, 33.5f)
-            histSala.add(s)
-            histTablero.add(t)
-            histPotencia.add(110f + Random.nextFloat() * 40f)
-        }
-    }
+    val releEncendido: Boolean get() = dispositivos.any { it.encendido }
+
+    fun dispositivo(id: Int): Dispositivo? = dispositivos.firstOrNull { it.id == id }
 
     // ---------- Configuración ----------
     var tempAlerta by mutableFloatStateOf(35f)
@@ -129,6 +117,29 @@ class EstadoSistema {
             categoria, tono, icono))
     }
 
+    init {
+        cargarUsuario()
+        var s = tempSala
+        var t = tempTablero
+        repeat(40) {
+            s = (s + Random.nextFloat() * 0.4f - 0.2f).coerceIn(22f, 27f)
+            t = (t + Random.nextFloat() * 0.6f - 0.3f).coerceIn(29f, 33.5f)
+            histSala.add(s)
+            histTablero.add(t)
+            histPotencia.add(110f + Random.nextFloat() * 40f)
+        }
+    }
+
+    private fun registrarHistorial() {
+        fun agregar(lista: MutableList<Float>, valor: Float) {
+            lista.add(valor)
+            if (lista.size > 60) lista.removeAt(0)
+        }
+        agregar(histSala, tempSala)
+        agregar(histTablero, tempTablero)
+        agregar(histPotencia, potencia)
+    }
+
     // ---------- Motor de demostración ----------
     fun tick() {
         ahora = System.currentTimeMillis()
@@ -138,12 +149,12 @@ class EstadoSistema {
         tempTablero = (tempTablero + Random.nextFloat() * 0.5f - 0.25f).coerceIn(29f, 33.5f)
         voltaje = 219f + Random.nextFloat() * 4f
 
-        if (emergencia || !releEncendido) {
-            corriente = 0f
-        } else {
-            corriente = 0.52f + Random.nextFloat() * 0.12f
-        }
-        potencia = corriente * voltaje
+        revisarAutomatismos()
+
+        val carga = if (emergencia) 0 else
+            6 + dispositivos.filter { it.encendido }.sumOf { it.potenciaW }
+        potencia = if (emergencia) 0f else carga * (0.97f + Random.nextFloat() * 0.06f)
+        corriente = potencia / voltaje
         energiaHoy += potencia / 1000f * (2f / 3600f)
         registrarHistorial()
 
@@ -151,7 +162,8 @@ class EstadoSistema {
             alertaTempActiva = true
             agregarAlerta(
                 "Temperatura alta",
-                "El tablero eléctrico superó los %.0f °C (%.1f °C).".format(Locale.US, tempAlerta, tempTablero),
+                "El tablero eléctrico superó los %.0f °C (%.1f °C)."
+                    .format(Locale.US, tempAlerta, tempTablero),
                 Categoria.TEMPERATURA, Tono.PRECAUCION, Icons.Filled.Thermostat
             )
         } else if (tempTablero < tempAlerta - 2f) {
@@ -159,27 +171,108 @@ class EstadoSistema {
         }
     }
 
-    // ---------- Acciones ----------
-    fun cambiarRele(encendido: Boolean) {
+    private fun revisarAutomatismos() {
         if (emergencia) return
-        releEncendido = encendido
+        val cal = Calendar.getInstance()
+        val minuto = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
+        val dia = (cal.get(Calendar.DAY_OF_WEEK) + 5) % 7
+        val clave = cal.get(Calendar.DAY_OF_YEAR) * 1440 + minuto
+
+        dispositivos.forEach { d ->
+            if (d.apagarEnMs in 1..ahora) {
+                d.apagarEnMs = 0L
+                if (d.encendido) {
+                    d.encendido = false
+                    agregarAlerta(
+                        "${d.nombre} apagado",
+                        "El temporizador terminó y se apagó automáticamente.",
+                        Categoria.GENERAL, Tono.INFO, Icons.Filled.Info
+                    )
+                }
+            }
+            if (d.programado && d.dias[dia] && d.ultimaEjecucion != clave) {
+                when (minuto) {
+                    d.minutoEncendido -> {
+                        d.ultimaEjecucion = clave
+                        if (!d.encendido) {
+                            d.encendido = true
+                            agregarAlerta(
+                                "${d.nombre} encendido",
+                                "Se encendió según su programación (${minutosATexto(minuto)}).",
+                                Categoria.GENERAL, Tono.INFO, Icons.Filled.Info
+                            )
+                        }
+                    }
+                    d.minutoApagado -> {
+                        d.ultimaEjecucion = clave
+                        if (d.encendido) {
+                            d.encendido = false
+                            d.apagarEnMs = 0L
+                            agregarAlerta(
+                                "${d.nombre} apagado",
+                                "Se apagó según su programación (${minutosATexto(minuto)}).",
+                                Categoria.GENERAL, Tono.INFO, Icons.Filled.Info
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ---------- Control de dispositivos ----------
+    fun alternarDispositivo(d: Dispositivo, encender: Boolean) {
+        if (emergencia || !dispositivoConectado) return
+        d.encendido = encender
+        if (!encender) d.apagarEnMs = 0L
         agregarAlerta(
-            if (encendido) "Relé encendido" else "Relé apagado",
-            if (encendido) "Encendiste la estufa desde la app." else "Apagaste la estufa desde la app.",
+            if (encender) "${d.nombre} encendido" else "${d.nombre} apagado",
+            if (encender) "Encendiste ${d.nombre} desde la app." else "Apagaste ${d.nombre} desde la app.",
             Categoria.GENERAL, Tono.INFO, Icons.Filled.Info
         )
     }
 
+    fun apagarTodo() {
+        if (!dispositivoConectado) return
+        val apagados = dispositivos.filter { it.encendido }
+        if (apagados.isEmpty()) return
+        apagados.forEach {
+            it.encendido = false
+            it.apagarEnMs = 0L
+        }
+        agregarAlerta(
+            "Dispositivos apagados",
+            "Apagaste ${apagados.size} dispositivo(s) con «Apagar todo».",
+            Categoria.GENERAL, Tono.INFO, Icons.Filled.Info
+        )
+    }
+
+    fun programarApagado(d: Dispositivo, minutos: Int) {
+        d.apagarEnMs = if (minutos > 0) System.currentTimeMillis() + minutos * 60_000L else 0L
+    }
+
+    fun agregarDispositivo(nombre: String, tipo: TipoDispositivo, canal: Int, potencia: Int) {
+        dispositivos.add(Dispositivo(proximoId++, nombre, tipo, canal, potencia))
+    }
+
+    fun eliminarDispositivo(d: Dispositivo) {
+        dispositivos.remove(d)
+    }
+
+    // ---------- Emergencia ----------
     fun registrarLectura(nuevaCorriente: Float, nuevoTablero: Float) {
         tempTablero = nuevoTablero
         if (nuevaCorriente > limiteCorriente && !emergencia) {
             emergencia = true
-            releEncendido = false
+            dispositivos.forEach {
+                it.encendido = false
+                it.apagarEnMs = 0L
+            }
             corriente = 0f
             potencia = 0f
             agregarAlerta(
                 "Posible cortocircuito",
-                "Se detectó un consumo anormal (%.1f A). El relé se apagó por seguridad."
+                "Se detectó un consumo anormal (%.1f A). Los dispositivos se apagaron por seguridad."
                     .format(Locale.US, nuevaCorriente),
                 Categoria.ELECTRICA, Tono.PELIGRO, Icons.Filled.Bolt
             )
@@ -199,18 +292,14 @@ class EstadoSistema {
         rearmePendiente = false
         agregarAlerta(
             "Sistema rearmado",
-            "El sistema volvió a operar. Enciende el relé cuando estés listo.",
+            "El sistema volvió a operar. Enciende los dispositivos cuando estés listo.",
             Categoria.GENERAL, Tono.INFO, Icons.Filled.Info
         )
     }
 
     fun solicitarRearme() = rearmar()
     fun simularCortocircuito() = registrarLectura(18f, tempTablero)
-    fun simularLecturas() {
-        if (emergencia) rearmar()
-        releEncendido = true
-    }
-
+    fun simularLecturas() { if (emergencia) rearmar() }
     fun alternarConexion() { dispositivoConectado = !dispositivoConectado }
     fun guardarConfig() { /* Por ahora los ajustes viven en memoria; luego se guardarán. */ }
     fun iniciarSincronizacion() {}
@@ -222,8 +311,6 @@ class EstadoSistema {
     }
 
     // ---------- Cuenta ----------
-    init { cargarUsuario() }
-
     fun cargarUsuario() {
         val u = auth.currentUser
         correo = u?.email ?: u?.phoneNumber ?: ""

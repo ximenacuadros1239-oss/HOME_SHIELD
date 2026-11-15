@@ -4,6 +4,9 @@ import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -29,21 +33,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.homeshieldai.ui.theme.*
-import androidx.compose.runtime.LaunchedEffect
-import kotlinx.coroutines.delay
-import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import com.example.homeshieldai.ui.theme.*
+import kotlinx.coroutines.delay
 
 data class Destino(val ruta: String, val titulo: String, val icono: ImageVector)
 
 val destinos = listOf(
     Destino("inicio", "Inicio", Icons.Filled.Home),
     Destino("consumo", "Consumo", Icons.Filled.BarChart),
+    Destino("control", "Control", Icons.Filled.Power),
     Destino("alertas", "Alertas", Icons.Filled.Notifications),
     Destino("ajustes", "Ajustes", Icons.Filled.Settings)
 )
@@ -67,12 +71,6 @@ fun AppPrincipal(estado: EstadoSistema) {
     val navController = rememberNavController()
     val entradaActual by navController.currentBackStackEntryAsState()
     val rutaActual = entradaActual?.destination?.route
-    LaunchedEffect(Unit) {
-        while (true) {
-            estado.tick()
-            delay(2000)
-        }
-    }
 
     val context = LocalContext.current
     val lanzadorPermiso = rememberLauncherForActivityResult(
@@ -87,6 +85,27 @@ fun AppPrincipal(estado: EstadoSistema) {
         }
     }
 
+    LaunchedEffect(Unit) {
+        while (true) {
+            estado.tick()
+            delay(2000)
+        }
+    }
+
+    // Una sola forma de ir a una pestaña: vuelve siempre a Inicio al retroceder
+    fun irAPestana(ruta: String) {
+        navController.navigate(ruta) {
+            popUpTo(navController.graph.findStartDestination().id) { inclusive = false }
+            launchSingleTop = true
+        }
+    }
+
+    val rutaResaltada = when {
+        rutaActual?.startsWith("sensor") == true || rutaActual == "cuenta" -> "inicio"
+        rutaActual?.startsWith("dispositivo") == true -> "control"
+        else -> rutaActual
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -96,35 +115,33 @@ fun AppPrincipal(estado: EstadoSistema) {
             containerColor = Color.Transparent,
             contentColor = TextoPrincipal,
             bottomBar = {
-                val rutaResaltada = when {
-                    rutaActual?.startsWith("sensor") == true || rutaActual == "cuenta" -> "inicio"
-                    else -> rutaActual
-                }
                 BarraInferior(rutaActual = rutaResaltada) { ruta ->
-                    navController.navigate(ruta) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+                    if (ruta != rutaActual) irAPestana(ruta)
                 }
             }
         ) { padding ->
             NavHost(
                 navController = navController,
                 startDestination = "inicio",
-                modifier = Modifier.padding(padding)
+                modifier = Modifier.padding(padding),
+                enterTransition = { fadeIn(tween(250)) },
+                exitTransition = { fadeOut(tween(150)) },
+                popEnterTransition = { fadeIn(tween(250)) },
+                popExitTransition = { fadeOut(tween(150)) }
             ) {
                 composable("inicio") {
                     PantallaInicio(
                         estado,
-                        onVerAlertas = { navController.navigate("alertas") },
+                        onVerAlertas = { irAPestana("alertas") },
                         onCuenta = { navController.navigate("cuenta") },
-                        onSensor = { id -> navController.navigate("sensor/$id") }
+                        onSensor = { id -> navController.navigate("sensor/$id") },
+                        onControl = { irAPestana("control") }
                     )
                 }
                 composable("consumo") { PantallaConsumo(estado) }
+                composable("control") {
+                    PantallaControl(estado) { id -> navController.navigate("dispositivo/$id") }
+                }
                 composable("alertas") { PantallaAlertas(estado) }
                 composable("ajustes") { PantallaAjustes(estado) }
                 composable("cuenta") {
@@ -137,6 +154,15 @@ fun AppPrincipal(estado: EstadoSistema) {
                     PantallaSensor(
                         estado,
                         entrada.arguments?.getString("id") ?: "sala"
+                    ) { navController.popBackStack() }
+                }
+                composable(
+                    "dispositivo/{id}",
+                    arguments = listOf(navArgument("id") { type = NavType.IntType })
+                ) { entrada ->
+                    PantallaDispositivo(
+                        estado,
+                        entrada.arguments?.getInt("id") ?: -1
                     ) { navController.popBackStack() }
                 }
             }

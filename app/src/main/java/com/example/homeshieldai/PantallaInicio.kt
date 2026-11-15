@@ -33,7 +33,8 @@ fun PantallaInicio(
     estado: EstadoSistema,
     onVerAlertas: () -> Unit,
     onCuenta: () -> Unit,
-    onSensor: (String) -> Unit
+    onSensor: (String) -> Unit,
+    onControl: () -> Unit
 ) {
     val (textoSala, colorSala) = estadoTemp(estado.tempSala, estado.tempAlerta)
     val (textoTablero, colorTablero) = estadoTemp(estado.tempTablero, estado.tempAlerta)
@@ -72,7 +73,7 @@ fun PantallaInicio(
                 "S/ %.2f".format(Locale.US, estado.gastoHoy), Modifier.weight(1f)
             )
         }
-        TarjetaRele(estado)
+        TarjetaDispositivos(estado, onControl)
         TarjetaUltimaAlerta(estado, onVerAlertas)
     }
 }
@@ -230,10 +231,9 @@ fun TarjetaDato(
 }
 
 @Composable
-fun TarjetaRele(estado: EstadoSistema) {
-    var confirmar by remember { mutableStateOf(false) }
-
-    TarjetaVidrio(modifier = Modifier.fillMaxWidth()) {
+fun TarjetaDispositivos(estado: EstadoSistema, onControl: () -> Unit) {
+    val encendidos = estado.dispositivos.count { it.encendido }
+    TarjetaVidrio(modifier = Modifier.fillMaxWidth(), onClick = onControl) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
@@ -246,49 +246,24 @@ fun TarjetaRele(estado: EstadoSistema) {
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("Estufa (Relé)", style = MaterialTheme.typography.titleMedium)
+                Text("Dispositivos", style = MaterialTheme.typography.titleMedium)
                 when {
-                    estado.emergencia -> EstadoPunto("Bloqueado por seguridad", Peligro)
+                    estado.emergencia -> EstadoPunto("Bloqueados por seguridad", Peligro)
                     !estado.dispositivoConectado ->
                         EstadoPunto("Sin conexión con el dispositivo", TextoSecundario)
-                    estado.releEncendido -> EstadoPunto("Encendida", Menta)
-                    else -> EstadoPunto("Apagada", TextoSecundario)
+                    else -> EstadoPunto(
+                        "$encendidos de ${estado.dispositivos.size} encendidos",
+                        if (encendidos > 0) Menta else TextoSecundario
+                    )
                 }
             }
-            Switch(
-                checked = estado.releEncendido,
-                onCheckedChange = { quiereEncender ->
-                    if (quiereEncender) confirmar = true else estado.cambiarRele(false)
-                },
-                enabled = !estado.emergencia && estado.dispositivoConectado,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = TextoPrincipal,
-                    checkedTrackColor = Menta,
-                    uncheckedThumbColor = TextoSecundario,
-                    uncheckedTrackColor = SuperficieAlta
-                )
-            )
+            if (encendidos > 0 && !estado.emergencia && estado.dispositivoConectado) {
+                TextButton(onClick = { estado.apagarTodo() }) {
+                    Text("Apagar todo", color = Peligro)
+                }
+            }
+            Icon(Icons.Filled.ChevronRight, null, tint = TextoSecundario)
         }
-    }
-
-    if (confirmar) {
-        AlertDialog(
-            onDismissRequest = { confirmar = false },
-            containerColor = Superficie,
-            title = { Text("¿Encender la estufa?") },
-            text = { Text("Asegúrate de que el aparato esté en buen estado y de que nadie lo esté manipulando.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    estado.cambiarRele(true)
-                    confirmar = false
-                }) { Text("Encender", color = Menta) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmar = false }) {
-                    Text("Cancelar", color = TextoSecundario)
-                }
-            }
-        )
     }
 }
 
