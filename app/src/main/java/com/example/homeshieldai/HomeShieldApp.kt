@@ -34,6 +34,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.homeshieldai.ui.theme.*
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 
 data class Destino(val ruta: String, val titulo: String, val icono: ImageVector)
 
@@ -63,6 +67,12 @@ fun AppPrincipal(estado: EstadoSistema) {
     val navController = rememberNavController()
     val entradaActual by navController.currentBackStackEntryAsState()
     val rutaActual = entradaActual?.destination?.route
+    LaunchedEffect(Unit) {
+        while (true) {
+            estado.tick()
+            delay(2000)
+        }
+    }
 
     val context = LocalContext.current
     val lanzadorPermiso = rememberLauncherForActivityResult(
@@ -86,7 +96,11 @@ fun AppPrincipal(estado: EstadoSistema) {
             containerColor = Color.Transparent,
             contentColor = TextoPrincipal,
             bottomBar = {
-                BarraInferior(rutaActual = rutaActual) { ruta ->
+                val rutaResaltada = when {
+                    rutaActual?.startsWith("sensor") == true || rutaActual == "cuenta" -> "inicio"
+                    else -> rutaActual
+                }
+                BarraInferior(rutaActual = rutaResaltada) { ruta ->
                     navController.navigate(ruta) {
                         popUpTo(navController.graph.findStartDestination().id) {
                             saveState = true
@@ -106,7 +120,8 @@ fun AppPrincipal(estado: EstadoSistema) {
                     PantallaInicio(
                         estado,
                         onVerAlertas = { navController.navigate("alertas") },
-                        onCuenta = { navController.navigate("cuenta") }
+                        onCuenta = { navController.navigate("cuenta") },
+                        onSensor = { id -> navController.navigate("sensor/$id") }
                     )
                 }
                 composable("consumo") { PantallaConsumo(estado) }
@@ -114,6 +129,15 @@ fun AppPrincipal(estado: EstadoSistema) {
                 composable("ajustes") { PantallaAjustes(estado) }
                 composable("cuenta") {
                     PantallaCuenta(estado) { navController.popBackStack() }
+                }
+                composable(
+                    "sensor/{id}",
+                    arguments = listOf(navArgument("id") { type = NavType.StringType })
+                ) { entrada ->
+                    PantallaSensor(
+                        estado,
+                        entrada.arguments?.getString("id") ?: "sala"
+                    ) { navController.popBackStack() }
                 }
             }
         }

@@ -17,11 +17,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.homeshieldai.ui.theme.*
 
 enum class Categoria { TEMPERATURA, ELECTRICA, GENERAL }
-
 
 enum class Tono { NORMAL, PRECAUCION, PELIGRO, INFO }
 
@@ -39,33 +39,164 @@ data class Alerta(
     val tiempo: String,
     val categoria: Categoria,
     val tono: Tono,
-    val icono: ImageVector
+    val icono: ImageVector,
+    val id: Long = System.nanoTime()
 )
 
-val alertasIniciales = listOf(
-
-    Alerta(
-        "Temperatura alta",
-        "El tablero eléctrico superó los 35 °C (38.0 °C).",
-        "Hace 10 min", Categoria.TEMPERATURA, Tono.PRECAUCION, Icons.Filled.Thermostat
-    ),
-    Alerta(
-        "Consumo elevado",
-        "Estás al 80% de tu límite mensual de electricidad.",
-        "Hace 1 h", Categoria.ELECTRICA, Tono.PRECAUCION, Icons.Filled.Bolt
-    ),
-    Alerta(
-        "Sistema normal",
-        "Las mediciones se encuentran dentro de los rangos configurados.",
-        "Hace 2 h", Categoria.GENERAL, Tono.NORMAL, Icons.Filled.CheckCircle
-    ),
-    Alerta(
-        "Conexión restablecida",
-        "El dispositivo volvió a conectarse correctamente.",
-        "Ayer, 18:30", Categoria.GENERAL, Tono.INFO, Icons.Filled.Info
-    )
-)
 val filtros = listOf("Todas", "Temperatura", "Eléctrica")
+
+@Composable
+fun PantallaAlertas(estado: EstadoSistema) {
+    var filtro by remember { mutableIntStateOf(0) }
+    var confirmarBorrado by remember { mutableStateOf(false) }
+    val lista = when (filtro) {
+        1 -> estado.alertas.filter { it.categoria == Categoria.TEMPERATURA }
+        2 -> estado.alertas.filter { it.categoria == Categoria.ELECTRICA }
+        else -> estado.alertas.toList()
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.size(48.dp))
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Alertas", style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    "${estado.alertas.size} eventos registrados",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextoSecundario
+                )
+            }
+            IconButton(
+                onClick = { confirmarBorrado = true },
+                enabled = estado.alertas.isNotEmpty()
+            ) {
+                Icon(Icons.Filled.DeleteSweep, "Borrar todas", tint = TextoSecundario)
+            }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            filtros.forEachIndexed { i, nombre ->
+                ChipFiltro(nombre, i == filtro, Modifier.weight(1f)) { filtro = i }
+            }
+        }
+
+        if (lista.isEmpty()) {
+            EstadoVacio()
+        } else {
+            Text(
+                "Desliza una alerta para borrarla",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextoSecundario,
+                modifier = Modifier.padding(start = 4.dp)
+            )
+            lista.forEach { alerta ->
+                key(alerta.id) {
+                    AlertaDeslizable(alerta) { estado.alertas.remove(alerta) }
+                }
+            }
+        }
+    }
+
+    if (confirmarBorrado) {
+        AlertDialog(
+            onDismissRequest = { confirmarBorrado = false },
+            containerColor = Superficie,
+            title = { Text("¿Borrar todas las alertas?") },
+            text = { Text("Se eliminará todo el historial de seguridad. Esta acción no se puede deshacer.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    estado.alertas.clear()
+                    confirmarBorrado = false
+                }) { Text("Borrar todo", color = Peligro) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmarBorrado = false }) {
+                    Text("Cancelar", color = TextoSecundario)
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun EstadoVacio() {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            Icons.Filled.NotificationsNone, null,
+            tint = Menta, modifier = Modifier.size(64.dp)
+        )
+        Spacer(Modifier.height(12.dp))
+        Text("Sin alertas", style = MaterialTheme.typography.titleLarge)
+        Text(
+            "Tu hogar está tranquilo. Cuando algo requiera atención, lo verás aquí.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextoSecundario,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp)
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AlertaDeslizable(alerta: Alerta, onBorrar: () -> Unit) {
+    val estadoDeslizar = rememberSwipeToDismissBoxState(
+        confirmValueChange = { valor ->
+            if (valor != SwipeToDismissBoxValue.Settled) {
+                onBorrar()
+                true
+            } else false
+        }
+    )
+    SwipeToDismissBox(
+        state = estadoDeslizar,
+        backgroundContent = {
+            val direccion = estadoDeslizar.dismissDirection
+            val fondo = if (direccion == SwipeToDismissBoxValue.Settled) Color.Transparent
+            else Peligro.copy(alpha = 0.25f)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(fondo)
+                    .padding(horizontal = 20.dp),
+                contentAlignment =
+                    if (direccion == SwipeToDismissBoxValue.StartToEnd) Alignment.CenterStart
+                    else Alignment.CenterEnd
+            ) {
+                if (direccion != SwipeToDismissBoxValue.Settled)
+                    Icon(Icons.Filled.Delete, "Borrar", tint = Peligro)
+            }
+        }
+    ) { TarjetaAlerta(alerta) }
+}
+
+@Composable
+fun ChipFiltro(texto: String, activo: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (activo) Menta else Superficie)
+            .clickable { onClick() }
+            .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            texto,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (activo) Fondo else TextoPrincipal
+        )
+    }
+}
 
 @Composable
 fun TarjetaAlerta(alerta: Alerta) {
@@ -99,62 +230,5 @@ fun TarjetaAlerta(alerta: Alerta) {
                 Text(alerta.mensaje, style = MaterialTheme.typography.bodyMedium)
             }
         }
-    }
-}
-@Composable
-fun PantallaAlertas(estado: EstadoSistema) {
-    var filtro by remember { mutableIntStateOf(0) }
-    val lista = when (filtro) {
-        1 -> estado.alertas.filter { it.categoria == Categoria.TEMPERATURA }
-        2 -> estado.alertas.filter { it.categoria == Categoria.ELECTRICA }
-        else -> estado.alertas.toList()
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Alertas", style = MaterialTheme.typography.headlineMedium)
-            Text(
-                "Historial de seguridad",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextoSecundario
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            filtros.forEachIndexed { i, nombre ->
-                ChipFiltro(nombre, i == filtro, Modifier.weight(1f)) { filtro = i }
-            }
-        }
-        lista.forEach { TarjetaAlerta(it) }
-        if (lista.isEmpty()) {
-            Text(
-                "Sin alertas en esta categoría.",
-                color = TextoSecundario,
-                modifier = Modifier.padding(24.dp)
-            )
-        }
-    }
-}
-
-@Composable
-fun ChipFiltro(texto: String, activo: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(50))
-            .background(if (activo) Menta else Superficie)
-            .clickable { onClick() }
-            .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            texto,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (activo) Fondo else TextoPrincipal
-        )
     }
 }
