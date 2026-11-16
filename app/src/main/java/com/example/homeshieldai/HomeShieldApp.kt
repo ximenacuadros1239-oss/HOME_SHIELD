@@ -59,6 +59,8 @@ fun HomeShieldApp() {
         EstadoSistema().also { e ->
             e.modoTema = leerModoTema(context)
             e.alCambiarTema = { guardarModoTema(context, it) }
+            cargarTarifa(context, e)
+            e.alGuardarTarifa = { guardarTarifa(context, e) }
         }
     }
     HomeShieldAITheme(estado.modoTema) {
@@ -103,6 +105,7 @@ fun AppPrincipal(estado: EstadoSistema) {
     val rutaResaltada = when {
         rutaActual?.startsWith("sensor") == true || rutaActual == "cuenta" -> "inicio"
         rutaActual?.startsWith("dispositivo") == true -> "control"
+        rutaActual == "tarifa" -> "consumo"
         else -> rutaActual
     }
 
@@ -135,10 +138,16 @@ fun AppPrincipal(estado: EstadoSistema) {
                         onVerAlertas = { irAPestana("alertas") },
                         onCuenta = { navController.navigate("cuenta") },
                         onSensor = { id -> navController.navigate("sensor/$id") },
-                        onControl = { irAPestana("control") }
+                        onControl = { irAPestana("control") },
+                        onTarifa = { navController.navigate("tarifa") }
                     )
                 }
-                composable("consumo") { PantallaConsumo(estado) }
+                composable("consumo") {
+                    PantallaConsumo(estado) { navController.navigate("tarifa") }
+                }
+                composable("tarifa") {
+                    PantallaTarifa(estado) { navController.popBackStack() }
+                }
                 composable("control") {
                     PantallaControl(estado) { id -> navController.navigate("dispositivo/$id") }
                 }

@@ -34,7 +34,8 @@ fun PantallaInicio(
     onVerAlertas: () -> Unit,
     onCuenta: () -> Unit,
     onSensor: (String) -> Unit,
-    onControl: () -> Unit
+    onControl: () -> Unit,
+    onTarifa: () -> Unit
 ) {
     val (textoSala, colorSala) = estadoTemp(estado.tempSala, estado.tempAlerta)
     val (textoTablero, colorTablero) = estadoTemp(estado.tempTablero, estado.tempAlerta)
@@ -53,6 +54,7 @@ fun PantallaInicio(
             hayAvisos, onVerAlertas, onCuenta
         )
         TarjetaProtegida(estado.emergencia, estado.dispositivoConectado, onVerAlertas)
+        if (!estado.tarifaConfigurada) TarjetaConfigurarTarifa(onTarifa)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             TarjetaSensor(
                 "Sala", "%.1f °C".format(Locale.US, estado.tempSala),
@@ -310,6 +312,31 @@ fun TarjetaUltimaAlerta(estado: EstadoSistema, onVerAlertas: () -> Unit) {
                     }
                 }
             }
+        }
+    }
+}
+@Composable
+fun TarjetaConfigurarTarifa(onClick: () -> Unit) {
+    TarjetaVidrio(
+        modifier = Modifier.fillMaxWidth(),
+        colorBorde = Menta.copy(alpha = 0.6f),
+        fondo = Brush.verticalGradient(
+            listOf(Menta.copy(alpha = 0.18f), Menta.copy(alpha = 0.06f))
+        ),
+        onClick = onClick
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.Receipt, null, tint = Menta, modifier = Modifier.size(32.dp))
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Configura tu tarifa de luz", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Dinos dónde vives y calculamos tu gasto como en tu recibo.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextoSecundario
+                )
+            }
+            Icon(Icons.Filled.ChevronRight, null, tint = TextoSecundario)
         }
     }
 }

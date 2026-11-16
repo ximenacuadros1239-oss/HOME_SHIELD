@@ -93,11 +93,33 @@ class EstadoSistema {
     var tempAlerta by mutableFloatStateOf(35f)
     var limiteCorriente by mutableFloatStateOf(16f)
     var presupuesto by mutableFloatStateOf(80f)
-    var tarifa by mutableFloatStateOf(0.68f)
+    var tarifa by mutableFloatStateOf(0.50f)
     var nombreHogar by mutableStateOf("Mi casa")
     var notificaciones by mutableStateOf(true)
 
-    val gastoHoy: Float get() = energiaHoy * tarifa
+    // ---------- Tarifa eléctrica ----------
+    var departamento by mutableStateOf("")
+    var distribuidora by mutableStateOf("")
+    var cargoFijo by mutableFloatStateOf(0f)
+    var alumbrado by mutableFloatStateOf(0f)
+    var diaCiclo by mutableIntStateOf(1)
+    var tarifaConfigurada by mutableStateOf(false)
+    var alGuardarTarifa: (() -> Unit)? = null
+    val igv = 0.18f
+
+    var energiaMesPrevio by mutableFloatStateOf(92.6f)
+    val energiaMes: Float get() = energiaMesPrevio + energiaHoy
+
+    fun costoEnergia(kWh: Float): Float = kWh * tarifa
+    fun costoTotal(kWh: Float): Float = (costoEnergia(kWh) + cargoFijo + alumbrado) * (1 + igv)
+
+    val gastoHoy: Float get() = costoEnergia(energiaHoy) * (1 + igv)
+    val gastoMes: Float get() = costoTotal(energiaMes)
+
+    fun guardarTarifa() {
+        tarifaConfigurada = true
+        alGuardarTarifa?.invoke()
+    }
 
     // ---------- Alertas ----------
     var alAlerta: ((String) -> Unit)? = null

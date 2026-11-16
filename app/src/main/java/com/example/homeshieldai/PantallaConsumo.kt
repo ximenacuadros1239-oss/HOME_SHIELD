@@ -8,7 +8,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -23,40 +22,48 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.homeshieldai.ui.theme.*
 import java.util.Locale
-import androidx.compose.ui.graphics.Color
+
 data class Periodo(
     val nombre: String,
-    val gasto: Double,
-    val limite: Double,
     val tituloGrafico: String,
     val etiquetas: List<String>,
     val valores: List<Double>
 )
 
 val periodos = listOf(
-    Periodo("Día", 2.10, 2.67, "Gasto por horas (S/)",
+    Periodo("Día", "Gasto por horas (S/)",
         listOf("0h", "4h", "8h", "12h", "16h", "20h"),
         listOf(0.1, 0.2, 0.4, 0.6, 0.5, 0.3)),
-    Periodo("Semana", 15.20, 18.67, "Gasto diario (S/)",
+    Periodo("Semana", "Gasto diario (S/)",
         listOf("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"),
         listOf(1.8, 2.0, 2.4, 2.1, 1.7, 2.9, 2.3)),
-    Periodo("Mes", 65.00, 80.00, "Gasto semanal (S/)",
+    Periodo("Mes", "Gasto semanal (S/)",
         listOf("Sem 1", "Sem 2", "Sem 3", "Sem 4"),
         listOf(15.9, 16.4, 16.1, 16.6))
 )
 
+private fun soles(v: Float) = "S/ " + "%.2f".format(Locale.US, v)
+
 @Composable
-fun PantallaConsumo(estado: EstadoSistema) {
+fun PantallaConsumo(estado: EstadoSistema, onTarifa: () -> Unit) {
     var seleccionado by remember { mutableIntStateOf(2) }
-    var tarifa by remember { mutableStateOf("0.68") }
-    var mostrarDialogo by remember { mutableStateOf(false) }
     val periodo = periodos[seleccionado]
+
+    val gasto = when (seleccionado) {
+        0 -> estado.gastoHoy.toDouble()
+        1 -> estado.gastoMes * 7.0 / 30.0
+        else -> estado.gastoMes.toDouble()
+    }
+    val limite = when (seleccionado) {
+        0 -> estado.presupuesto / 30.0
+        1 -> estado.presupuesto * 7.0 / 30.0
+        else -> estado.presupuesto.toDouble()
+    }
 
     Column(
         modifier = Modifier
@@ -73,62 +80,71 @@ fun PantallaConsumo(estado: EstadoSistema) {
             color = TextoSecundario
         )
         Pestanas(seleccionado) { seleccionado = it }
-        val limite = when (seleccionado) {
-            0 -> estado.presupuesto / 30.0
-            1 -> estado.presupuesto * 7.0 / 30.0
-            else -> estado.presupuesto.toDouble()
-        }
-        DialPresupuesto(periodo.gasto, limite)
+        DialPresupuesto(gasto, limite)
+
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MiniDato(Icons.Filled.Bolt, "12.5 kWh", "Este mes", Modifier.weight(1f))
-            MiniDato(Icons.Filled.CalendarToday, "S/ 2.10", "Hoy", Modifier.weight(1f))
+            MiniDato(Icons.Filled.Bolt, "%.1f kWh".format(Locale.US, estado.energiaMes),
+                "Este mes", Modifier.weight(1f))
+            MiniDato(Icons.Filled.CalendarToday, soles(estado.gastoHoy), "Hoy", Modifier.weight(1f))
             MiniDato(Icons.Filled.CalendarMonth, "S/ 1.95", "Ayer", Modifier.weight(1f))
         }
+
         GraficoBarras(periodo.tituloGrafico, periodo.etiquetas, periodo.valores)
-        TarjetaVidrio(modifier = Modifier.fillMaxWidth(), onClick = { mostrarDialogo = true }) {
+
+        // ----- Detalle del costo del mes -----
+        TarjetaVidrio(modifier = Modifier.fillMaxWidth()) {
+            Text("Detalle del costo del mes", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            val energia = estado.costoEnergia(estado.energiaMes)
+            val subtotal = energia + estado.cargoFijo + estado.alumbrado
+            FilaCosto(
+                "Energía (%.1f kWh × S/ %.3f)".format(Locale.US, estado.energiaMes, estado.tarifa),
+                soles(energia)
+            )
+            FilaCosto("Cargo fijo", soles(estado.cargoFijo))
+            FilaCosto("Alumbrado público", soles(estado.alumbrado))
+            FilaCosto("IGV (%.0f %%)".format(Locale.US, estado.igv * 100), soles(subtotal * estado.igv))
+            HorizontalDivider(color = Borde, modifier = Modifier.padding(vertical = 8.dp))
+            Row {
+                Text("Total estimado", style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f))
+                Text(soles(estado.gastoMes), style = MaterialTheme.typography.titleMedium, color = Menta)
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Estimación con tu consumo medido. Tu recibo puede incluir otros cargos.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextoSecundario
+            )
+        }
+
+        // ----- Tarifa -----
+        TarjetaVidrio(modifier = Modifier.fillMaxWidth(), onClick = onTarifa) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.Receipt, null, tint = Menta)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Tarifa eléctrica", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "S/ $tarifa por kWh",
+                        if (estado.tarifaConfigurada)
+                            "${estado.distribuidora} · S/ ${"%.3f".format(Locale.US, estado.tarifa)} por kWh"
+                        else "Toca para configurar tu tarifa",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = TextoSecundario
+                        color = if (estado.tarifaConfigurada) TextoSecundario else Ambar
                     )
                 }
                 Icon(Icons.Filled.ChevronRight, null, tint = TextoSecundario)
             }
         }
     }
+}
 
-    if (mostrarDialogo) {
-        var texto by remember { mutableStateOf(tarifa) }
-        AlertDialog(
-            onDismissRequest = { mostrarDialogo = false },
-            containerColor = Superficie,
-            title = { Text("Tarifa de tu recibo") },
-            text = {
-                OutlinedTextField(
-                    value = texto,
-                    onValueChange = { texto = it },
-                    label = { Text("S/ por kWh") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (texto.toDoubleOrNull() != null) tarifa = texto
-                    mostrarDialogo = false
-                }) { Text("Guardar", color = Menta) }
-            },
-            dismissButton = {
-                TextButton(onClick = { mostrarDialogo = false }) {
-                    Text("Cancelar", color = TextoSecundario)
-                }
-            }
-        )
+@Composable
+private fun FilaCosto(concepto: String, valor: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+        Text(concepto, style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f))
+        Text(valor, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -167,19 +183,24 @@ fun DialPresupuesto(gasto: Double, limite: Double) {
     val porcentaje = (gasto / limite).toFloat().coerceIn(0f, 1f)
     val animado by animateFloatAsState(porcentaje, tween(800), label = "dial")
     val colorPista = SuperficieAlta
-    val colorFin = Menta
-    val colorInicio = Menta.copy(alpha = 0.45f)
+    val colorFin = if (porcentaje >= 1f) Peligro else if (porcentaje >= 0.85f) Ambar else Menta
+    val colorInicio = colorFin.copy(alpha = 0.45f)
 
     Box(modifier = Modifier.size(220.dp), contentAlignment = Alignment.Center) {
-        val brillo = Menta.copy(alpha = 0.22f)
-        Canvas(Modifier.fillMaxSize()) {
-            val centro = Offset(size.width / 2, 0f)
-            drawCircle(
-                brush = Brush.radialGradient(
-                    listOf(brillo, Color.Transparent),
-                    center = centro, radius = size.width * 1.1f
-                ),
-                radius = size.width * 1.1f, center = centro
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val grosor = 18.dp.toPx()
+            val arco = Size(size.width - grosor, size.height - grosor)
+            val origen = Offset(grosor / 2, grosor / 2)
+            drawArc(
+                color = colorPista, startAngle = -90f, sweepAngle = 360f,
+                useCenter = false, topLeft = origen, size = arco,
+                style = Stroke(width = grosor)
+            )
+            drawArc(
+                brush = Brush.sweepGradient(listOf(colorInicio, colorFin)),
+                startAngle = -90f, sweepAngle = 360f * animado,
+                useCenter = false, topLeft = origen, size = arco,
+                style = Stroke(width = grosor, cap = StrokeCap.Round)
             )
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -198,7 +219,7 @@ fun DialPresupuesto(gasto: Double, limite: Double) {
     Text(
         "${(porcentaje * 100).toInt()}% del presupuesto",
         style = MaterialTheme.typography.labelLarge,
-        color = Menta
+        color = colorFin
     )
 }
 
