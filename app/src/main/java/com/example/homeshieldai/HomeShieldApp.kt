@@ -105,7 +105,7 @@ fun AppPrincipal(estado: EstadoSistema) {
     val rutaResaltada = when {
         rutaActual?.startsWith("sensor") == true || rutaActual == "cuenta" -> "inicio"
         rutaActual?.startsWith("dispositivo") == true -> "control"
-        rutaActual == "tarifa" -> "consumo"
+        rutaActual == "tarifa" -> "ajustes"
         else -> rutaActual
     }
 
@@ -142,8 +142,9 @@ fun AppPrincipal(estado: EstadoSistema) {
                         onTarifa = { navController.navigate("tarifa") }
                     )
                 }
-                composable("consumo") {
-                    PantallaConsumo(estado) { navController.navigate("tarifa") }
+                composable("consumo") { PantallaConsumo(estado) }
+                composable("ajustes") {
+                    PantallaAjustes(estado) { navController.navigate("tarifa") }
                 }
                 composable("tarifa") {
                     PantallaTarifa(estado) { navController.popBackStack() }
@@ -152,7 +153,6 @@ fun AppPrincipal(estado: EstadoSistema) {
                     PantallaControl(estado) { id -> navController.navigate("dispositivo/$id") }
                 }
                 composable("alertas") { PantallaAlertas(estado) }
-                composable("ajustes") { PantallaAjustes(estado) }
                 composable("cuenta") {
                     PantallaCuenta(estado) { navController.popBackStack() }
                 }

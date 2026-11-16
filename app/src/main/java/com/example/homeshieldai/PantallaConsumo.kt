@@ -50,7 +50,7 @@ val periodos = listOf(
 private fun soles(v: Float) = "S/ " + "%.2f".format(Locale.US, v)
 
 @Composable
-fun PantallaConsumo(estado: EstadoSistema, onTarifa: () -> Unit) {
+fun PantallaConsumo(estado: EstadoSistema) {
     var seleccionado by remember { mutableIntStateOf(2) }
     val periodo = periodos[seleccionado]
 
@@ -119,22 +119,13 @@ fun PantallaConsumo(estado: EstadoSistema, onTarifa: () -> Unit) {
         }
 
         // ----- Tarifa -----
-        TarjetaVidrio(modifier = Modifier.fillMaxWidth(), onClick = onTarifa) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Receipt, null, tint = Menta)
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("Tarifa eléctrica", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        if (estado.tarifaConfigurada)
-                            "${estado.distribuidora} · S/ ${"%.3f".format(Locale.US, estado.tarifa)} por kWh"
-                        else "Toca para configurar tu tarifa",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (estado.tarifaConfigurada) TextoSecundario else Ambar
-                    )
-                }
-                Icon(Icons.Filled.ChevronRight, null, tint = TextoSecundario)
-            }
+        if (!estado.tarifaConfigurada) {
+            Text(
+                "Configura tu tarifa en Ajustes para ver un costo más exacto.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Ambar,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }

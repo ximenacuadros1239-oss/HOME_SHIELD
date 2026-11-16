@@ -20,7 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 
 @Composable
-fun PantallaAjustes(estado: EstadoSistema) {
+fun PantallaAjustes(estado: EstadoSistema, onTarifa: () -> Unit) {
     var dialogoRearmar by remember { mutableStateOf(false) }
 
     Column(
@@ -58,6 +58,28 @@ fun PantallaAjustes(estado: EstadoSistema) {
                 "S/ %.0f".format(Locale.US, estado.presupuesto),
                 estado.presupuesto, 20f..200f, "S/ 20", "S/ 200"
             ) { estado.presupuesto = it }
+        }
+
+        TituloSeccion("Tarifa eléctrica")
+        TarjetaVidrio(modifier = Modifier.fillMaxWidth(), onClick = onTarifa) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Receipt, null, tint = Menta)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        if (estado.tarifaConfigurada) estado.distribuidora else "Sin configurar",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        if (estado.tarifaConfigurada)
+                            "${estado.departamento} · S/ ${"%.3f".format(Locale.US, estado.tarifa)} por kWh"
+                        else "Dinos dónde vives para calcular tu gasto como en tu recibo.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (estado.tarifaConfigurada) TextoSecundario else Ambar
+                    )
+                }
+                Icon(Icons.Filled.ChevronRight, null, tint = TextoSecundario)
+            }
         }
 
         TituloSeccion("Notificaciones")
