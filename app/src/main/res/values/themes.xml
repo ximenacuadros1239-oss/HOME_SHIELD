@@ -2,4 +2,9 @@
 <resources>
 
     <style name="Theme.HomeShieldAI" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.HomeShieldAI.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#0A1624</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.HomeShieldAI</item>
+    </style>
 </resources>
