@@ -62,16 +62,7 @@ fun PantallaAlertas(estado: EstadoSistema) {
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Spacer(Modifier.size(48.dp))
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Alertas", style = MaterialTheme.typography.headlineMedium)
-                Text(
-                    "${estado.alertas.size} eventos registrados",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextoSecundario
-                )
-            }
+        CabeceraPantalla("Alertas", "${estado.alertas.size} eventos registrados", estado) {
             IconButton(
                 onClick = { confirmarBorrado = true },
                 enabled = estado.alertas.isNotEmpty()

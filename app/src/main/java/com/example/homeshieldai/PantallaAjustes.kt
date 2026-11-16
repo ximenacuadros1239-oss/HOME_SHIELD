@@ -30,14 +30,7 @@ fun PantallaAjustes(estado: EstadoSistema, onTarifa: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Ajustes", style = MaterialTheme.typography.headlineMedium)
-            Text(
-                "Personalización y seguridad",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextoSecundario
-            )
-        }
+        CabeceraPantalla("Ajustes", "Personalización y seguridad", estado)
 
         TituloSeccion("Límites de seguridad")
         TarjetaVidrio(modifier = Modifier.fillMaxWidth()) {

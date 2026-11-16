@@ -73,12 +73,7 @@ fun PantallaConsumo(estado: EstadoSistema) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Consumo", style = MaterialTheme.typography.headlineMedium)
-        Text(
-            "El ahorro de tu hogar",
-            style = MaterialTheme.typography.bodyMedium,
-            color = TextoSecundario
-        )
+        CabeceraPantalla("Consumo", "El ahorro de tu hogar", estado)
         Pestanas(seleccionado) { seleccionado = it }
         DialPresupuesto(gasto, limite)
 

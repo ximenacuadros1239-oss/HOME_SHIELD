@@ -37,14 +37,7 @@ fun PantallaControl(estado: EstadoSistema, onAbrir: (Int) -> Unit) {
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Control", style = MaterialTheme.typography.headlineMedium)
-            Text(
-                "Tus dispositivos conectados",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextoSecundario
-            )
-        }
+        CabeceraPantalla("Control", "Tus dispositivos conectados", estado)
 
         if (estado.emergencia) {
             Aviso(
