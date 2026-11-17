@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -41,6 +42,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.homeshieldai.ui.theme.*
 import kotlinx.coroutines.delay
+import androidx.compose.runtime.setValue
 
 data class Destino(val ruta: String, val titulo: String, val icono: ImageVector)
 
@@ -64,10 +66,22 @@ fun HomeShieldApp() {
         }
     }
     HomeShieldAITheme(estado.modoTema) {
-        if (estado.sesionIniciada) AppPrincipal(estado) else PantallaLogin(estado)
+        if (!estado.sesionIniciada) {
+            PantallaLogin(estado)
+        } else {
+            val uid = estado.uidActual
+            var vista by remember(uid) { mutableStateOf(bienvenidaVista(context, uid)) }
+            if (vista) {
+                AppPrincipal(estado)
+            } else {
+                PantallaBienvenida(estado) {
+                    marcarBienvenidaVista(context, uid)
+                    vista = true
+                }
+            }
+        }
     }
 }
-
 @Composable
 fun AppPrincipal(estado: EstadoSistema) {
     val navController = rememberNavController()

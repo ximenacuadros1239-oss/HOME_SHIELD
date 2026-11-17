@@ -53,6 +53,8 @@ class EstadoSistema {
     var correo by mutableStateOf("")
     var cargando by mutableStateOf(false)
     var codigoEnviado by mutableStateOf(false)
+
+    val uidActual: String get() = auth.currentUser?.uid ?: ""
     private var verificationId: String? = null
     private var tokenReenvio: PhoneAuthProvider.ForceResendingToken? = null
 
