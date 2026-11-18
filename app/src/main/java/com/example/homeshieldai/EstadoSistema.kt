@@ -53,10 +53,9 @@ class EstadoSistema {
     var correo by mutableStateOf("")
     var cargando by mutableStateOf(false)
     var codigoEnviado by mutableStateOf(false)
-
-    val uidActual: String get() = auth.currentUser?.uid ?: ""
     private var verificationId: String? = null
     private var tokenReenvio: PhoneAuthProvider.ForceResendingToken? = null
+    val uidActual: String get() = auth.currentUser?.uid ?: ""
 
     // ---------- Apariencia ----------
     var modoTema by mutableStateOf(ModoTema.SISTEMA)
@@ -75,6 +74,8 @@ class EstadoSistema {
     var ahora by mutableLongStateOf(System.currentTimeMillis())
     var errorSync by mutableStateOf<String?>(null)
     private var alertaTempActiva = false
+    private var avisoPres80 = false
+    private var avisoPres100 = false
 
     val histSala = mutableStateListOf<Float>()
     val histTablero = mutableStateListOf<Float>()
@@ -86,20 +87,22 @@ class EstadoSistema {
         Dispositivo(2, "Ventilador", TipoDispositivo.VENTILADOR, 2, 60, false)
     )
     private var proximoId = 3
-
     val releEncendido: Boolean get() = dispositivos.any { it.encendido }
-
     fun dispositivo(id: Int): Dispositivo? = dispositivos.firstOrNull { it.id == id }
 
     // ---------- Configuración ----------
     var tempAlerta by mutableFloatStateOf(35f)
     var limiteCorriente by mutableFloatStateOf(16f)
     var presupuesto by mutableFloatStateOf(80f)
-    var tarifa by mutableFloatStateOf(0.50f)
     var nombreHogar by mutableStateOf("Mi casa")
     var notificaciones by mutableStateOf(true)
+    var avisoTemperatura by mutableStateOf(true)
+    var avisoPresupuesto by mutableStateOf(true)
+    var alGuardarConfig: (() -> Unit)? = null
+    fun guardarConfig() { alGuardarConfig?.invoke() }
 
     // ---------- Tarifa eléctrica ----------
+    var tarifa by mutableFloatStateOf(0.50f)
     var departamento by mutableStateOf("")
     var distribuidora by mutableStateOf("")
     var cargoFijo by mutableFloatStateOf(0f)
@@ -114,7 +117,6 @@ class EstadoSistema {
 
     fun costoEnergia(kWh: Float): Float = kWh * tarifa
     fun costoTotal(kWh: Float): Float = (costoEnergia(kWh) + cargoFijo + alumbrado) * (1 + igv)
-
     val gastoHoy: Float get() = costoEnergia(energiaHoy) * (1 + igv)
     val gastoMes: Float get() = costoTotal(energiaMes)
 
@@ -124,21 +126,29 @@ class EstadoSistema {
     }
 
     // ---------- Alertas ----------
-    var alAlerta: ((String) -> Unit)? = null
+    /** (título, mensaje, tono). Lo conecta la app para mostrar la notificación del celular. */
+    var alAlerta: ((String, String, Tono) -> Unit)? = null
+
     val alertas = mutableStateListOf<Alerta>().apply {
-        add(Alerta("Consumo elevado", "Estás al 80% de tu límite mensual de electricidad.",
-            "Hoy, 09:40", Categoria.ELECTRICA, Tono.PRECAUCION, Icons.Filled.Bolt))
-        add(Alerta("Sistema normal", "Las mediciones se encuentran dentro de los rangos configurados.",
+        add(Alerta("Sistema normal", "Las mediciones están dentro de los rangos que configuraste.",
             "Hoy, 08:10", Categoria.GENERAL, Tono.NORMAL, Icons.Filled.CheckCircle))
         add(Alerta("Conexión restablecida", "El dispositivo volvió a conectarse correctamente.",
             "Ayer, 18:30", Categoria.GENERAL, Tono.INFO, Icons.Filled.Info))
     }
 
     private fun agregarAlerta(
-        titulo: String, mensaje: String, categoria: Categoria, tono: Tono, icono: ImageVector
+        titulo: String,
+        mensaje: String,
+        categoria: Categoria,
+        tono: Tono,
+        icono: ImageVector,
+        notificar: Boolean = false
     ) {
-        alertas.add(0, Alerta(titulo, mensaje, formatoFecha(System.currentTimeMillis()),
-            categoria, tono, icono))
+        alertas.add(
+            0,
+            Alerta(titulo, mensaje, formatoFecha(System.currentTimeMillis()), categoria, tono, icono)
+        )
+        if (notificar && notificaciones) alAlerta?.invoke(titulo, mensaje, tono)
     }
 
     init {
@@ -182,17 +192,52 @@ class EstadoSistema {
         energiaHoy += potencia / 1000f * (2f / 3600f)
         registrarHistorial()
 
+        revisarTemperatura()
+        revisarPresupuesto()
+    }
+
+    private fun revisarTemperatura() {
         if (tempTablero >= tempAlerta && !alertaTempActiva) {
             alertaTempActiva = true
             agregarAlerta(
-                "Temperatura alta",
-                "El tablero eléctrico superó los %.0f °C (%.1f °C)."
-                    .format(Locale.US, tempAlerta, tempTablero),
-                Categoria.TEMPERATURA, Tono.PRECAUCION, Icons.Filled.Thermostat
+                "Temperatura alta en el tablero",
+                "El tablero eléctrico llegó a %.1f °C y tu límite es de %.0f °C. Revisa que tenga buena ventilación."
+                    .format(Locale.US, tempTablero, tempAlerta),
+                Categoria.TEMPERATURA, Tono.PRECAUCION, Icons.Filled.Thermostat,
+                notificar = avisoTemperatura
             )
         } else if (tempTablero < tempAlerta - 2f) {
             alertaTempActiva = false
         }
+    }
+
+    private fun revisarPresupuesto() {
+        if (presupuesto <= 0f) return
+        val gastado = gastoMes
+        val razon = gastado / presupuesto
+
+        if (razon >= 1f && !avisoPres100) {
+            avisoPres100 = true
+            avisoPres80 = true
+            agregarAlerta(
+                "Superaste tu presupuesto",
+                "Este mes ya gastaste S/ %.2f y tu presupuesto era de S/ %.2f (S/ %.2f de más). Revisa qué aparatos puedes apagar."
+                    .format(Locale.US, gastado, presupuesto, gastado - presupuesto),
+                Categoria.ELECTRICA, Tono.PRECAUCION, Icons.Filled.Bolt,
+                notificar = avisoPresupuesto
+            )
+        } else if (razon >= 0.8f && razon < 1f && !avisoPres80) {
+            avisoPres80 = true
+            agregarAlerta(
+                "Vas al 80 % de tu presupuesto",
+                "Llevas gastados S/ %.2f de S/ %.2f este mes. Te quedan S/ %.2f."
+                    .format(Locale.US, gastado, presupuesto, presupuesto - gastado),
+                Categoria.ELECTRICA, Tono.PRECAUCION, Icons.Filled.Bolt,
+                notificar = avisoPresupuesto
+            )
+        }
+        if (razon < 0.75f) avisoPres80 = false
+        if (razon < 0.95f) avisoPres100 = false
     }
 
     private fun revisarAutomatismos() {
@@ -258,15 +303,27 @@ class EstadoSistema {
 
     fun apagarTodo() {
         if (!dispositivoConectado) return
-        val apagados = dispositivos.filter { it.encendido }
-        if (apagados.isEmpty()) return
-        apagados.forEach {
+        val encendidos = dispositivos.filter { it.encendido }
+        if (encendidos.isEmpty()) return
+        encendidos.forEach {
             it.encendido = false
             it.apagarEnMs = 0L
         }
         agregarAlerta(
             "Dispositivos apagados",
-            "Apagaste ${apagados.size} dispositivo(s) con «Apagar todo».",
+            "Apagaste ${encendidos.size} dispositivo(s) con «Apagar todo».",
+            Categoria.GENERAL, Tono.INFO, Icons.Filled.Info
+        )
+    }
+
+    fun encenderTodo() {
+        if (emergencia || !dispositivoConectado) return
+        val apagados = dispositivos.filter { !it.encendido }
+        if (apagados.isEmpty()) return
+        apagados.forEach { it.encendido = true }
+        agregarAlerta(
+            "Dispositivos encendidos",
+            "Encendiste ${apagados.size} dispositivo(s) con «Encender todo».",
             Categoria.GENERAL, Tono.INFO, Icons.Filled.Info
         )
     }
@@ -296,16 +353,11 @@ class EstadoSistema {
             potencia = 0f
             agregarAlerta(
                 "Posible cortocircuito",
-                "Se detectó un consumo anormal (%.1f A). Los dispositivos se apagaron por seguridad."
-                    .format(Locale.US, nuevaCorriente),
-                Categoria.ELECTRICA, Tono.PELIGRO, Icons.Filled.Bolt
+                "Se detectó una corriente de %.0f A, mayor al límite de %.0f A. Se cortó la energía de tus dispositivos para evitar un incendio. Revisa tus aparatos antes de rearmar."
+                    .format(Locale.US, nuevaCorriente, limiteCorriente),
+                Categoria.ELECTRICA, Tono.PELIGRO, Icons.Filled.Bolt,
+                notificar = true
             )
-            if (notificaciones) {
-                alAlerta?.invoke(
-                    "Se detectó un consumo anormal (%.0f A). El relé se ha apagado automáticamente para evitar un incendio. Revisa tus aparatos."
-                        .format(Locale.US, nuevaCorriente)
-                )
-            }
         } else if (!emergencia) {
             corriente = nuevaCorriente
         }
@@ -322,10 +374,9 @@ class EstadoSistema {
     }
 
     fun solicitarRearme() = rearmar()
-    fun simularCortocircuito() = registrarLectura(18f, tempTablero)
+    fun simularCortocircuito() = registrarLectura(maxOf(18f, limiteCorriente + 2f), tempTablero)
     fun simularLecturas() { if (emergencia) rearmar() }
     fun alternarConexion() { dispositivoConectado = !dispositivoConectado }
-    fun guardarConfig() { /* Por ahora los ajustes viven en memoria; luego se guardarán. */ }
     fun iniciarSincronizacion() {}
     fun detenerSincronizacion() {}
 

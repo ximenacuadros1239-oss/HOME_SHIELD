@@ -202,10 +202,19 @@ fun DialPresupuesto(gasto: Double, limite: Double) {
             )
         }
     }
+    val restante = limite - gasto
     Text(
-        "${(porcentaje * 100).toInt()}% del presupuesto",
+        if (restante >= 0)
+            "Te quedan S/ %.2f de tu presupuesto".format(Locale.US, restante)
+        else
+            "Superaste tu presupuesto por S/ %.2f".format(Locale.US, -restante),
         style = MaterialTheme.typography.labelLarge,
         color = colorFin
+    )
+    Text(
+        "Usaste el ${(gasto / limite * 100).toInt()} % de lo que planeaste gastar",
+        style = MaterialTheme.typography.bodyMedium,
+        color = TextoSecundario
     )
 }
 

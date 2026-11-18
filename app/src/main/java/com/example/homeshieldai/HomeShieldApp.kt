@@ -63,6 +63,8 @@ fun HomeShieldApp() {
             e.alCambiarTema = { guardarModoTema(context, it) }
             cargarTarifa(context, e)
             e.alGuardarTarifa = { guardarTarifa(context, e) }
+            cargarAjustes(context, e)
+            e.alGuardarConfig = { guardarAjustes(context, e) }
         }
     }
     HomeShieldAITheme(estado.modoTema) {
@@ -94,8 +96,10 @@ fun AppPrincipal(estado: EstadoSistema) {
     ) { }
 
     LaunchedEffect(Unit) {
-        crearCanalAlertas(context)
-        estado.alAlerta = { mensaje -> mostrarNotificacionPeligro(context, mensaje) }
+        crearCanalesNotificacion(context)
+        estado.alAlerta = { titulo, mensaje, tono ->
+            mostrarNotificacion(context, titulo, mensaje, tono)
+        }
         if (Build.VERSION.SDK_INT >= 33) {
             lanzadorPermiso.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
@@ -157,7 +161,11 @@ fun AppPrincipal(estado: EstadoSistema) {
                 }
                 composable("consumo") { PantallaConsumo(estado) }
                 composable("ajustes") {
-                    PantallaAjustes(estado) { navController.navigate("tarifa") }
+                    PantallaAjustes(
+                        estado,
+                        onCuenta = { navController.navigate("cuenta") },
+                        onTarifa = { navController.navigate("tarifa") }
+                    )
                 }
                 composable("tarifa") {
                     PantallaTarifa(estado) { navController.popBackStack() }

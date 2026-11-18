@@ -41,6 +41,8 @@ fun PantallaInicio(
     val hayAvisos = estado.emergencia ||
             estado.alertas.take(3).any { it.tono == Tono.PELIGRO || it.tono == Tono.PRECAUCION }
 
+    var verEstado by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -52,7 +54,7 @@ fun PantallaInicio(
             estado.nombre.take(1).uppercase().ifBlank { "?" },
             hayAvisos, onVerAlertas, onCuenta
         )
-        TarjetaProtegida(estado.emergencia, estado.dispositivoConectado, onVerAlertas)
+        TarjetaProtegida(estado.emergencia, estado.dispositivoConectado) { verEstado = true }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             TarjetaSensor(
                 "Sala", "%.1f °C".format(Locale.US, estado.tempSala),
@@ -76,6 +78,7 @@ fun PantallaInicio(
         TarjetaDispositivos(estado, onControl)
         TarjetaUltimaAlerta(estado, onVerAlertas)
     }
+    if (verEstado) HojaEstadoSistema(estado) { verEstado = false }
 }
 
 @Composable
@@ -310,6 +313,76 @@ fun TarjetaUltimaAlerta(estado: EstadoSistema, onVerAlertas: () -> Unit) {
                     }
                 }
             }
+        }
+    }
+}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HojaEstadoSistema(estado: EstadoSistema, onCerrar: () -> Unit) {
+    val (textoSala, colorSala) = estadoTemp(estado.tempSala, estado.tempAlerta)
+    val (textoTablero, colorTablero) = estadoTemp(estado.tempTablero, estado.tempAlerta)
+    val encendidos = estado.dispositivos.count { it.encendido }
+
+    ModalBottomSheet(onDismissRequest = onCerrar, containerColor = Superficie) {
+        Column(
+            modifier = Modifier.padding(horizontal = 20.dp).padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text("Estado del sistema", style = MaterialTheme.typography.titleLarge)
+            Text(
+                when {
+                    estado.emergencia -> "Hubo un corte de emergencia. Rearma el sistema en Ajustes."
+                    !estado.dispositivoConectado -> "No llegan lecturas del dispositivo."
+                    else -> "Todo funciona con normalidad."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextoSecundario
+            )
+            Spacer(Modifier.height(10.dp))
+            FilaEstado(
+                Icons.Filled.Wifi, "Conexión con el dispositivo",
+                if (estado.dispositivoConectado) "Conectado" else "Sin conexión",
+                if (estado.dispositivoConectado) Menta else Ambar
+            )
+            FilaEstado(
+                Icons.Filled.Thermostat, "Sensor de la sala",
+                "%.1f °C · %s".format(Locale.US, estado.tempSala, textoSala), colorSala
+            )
+            FilaEstado(
+                Icons.Filled.Thermostat, "Sensor del tablero",
+                "%.1f °C · %s".format(Locale.US, estado.tempTablero, textoTablero), colorTablero
+            )
+            FilaEstado(
+                Icons.Filled.Bolt, "Medidor de consumo",
+                "%.0f W · %.2f A".format(Locale.US, estado.potencia, estado.corriente),
+                if (estado.emergencia) Peligro else Menta
+            )
+            FilaEstado(
+                Icons.Filled.Power, "Dispositivos",
+                "$encendidos de ${estado.dispositivos.size} encendidos",
+                if (estado.emergencia) Peligro else Menta
+            )
+        }
+    }
+}
+
+@Composable
+fun FilaEstado(icono: ImageVector, titulo: String, valor: String, color: Color) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(11.dp))
+                .background(color.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) { Icon(icono, null, tint = color, modifier = Modifier.size(20.dp)) }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(titulo, style = MaterialTheme.typography.titleMedium)
+            Text(valor, style = MaterialTheme.typography.bodyMedium, color = color)
         }
     }
 }

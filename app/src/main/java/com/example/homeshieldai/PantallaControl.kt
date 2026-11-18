@@ -29,6 +29,8 @@ fun PantallaControl(estado: EstadoSistema, onAbrir: (Int) -> Unit) {
     var porEncender by remember { mutableStateOf<Dispositivo?>(null) }
     val bloqueado = estado.emergencia || !estado.dispositivoConectado
     val encendidos = estado.dispositivos.count { it.encendido }
+    var confirmarTodo by remember { mutableStateOf(false) }
+    val apagados = estado.dispositivos.count { !it.encendido }
 
     Column(
         modifier = Modifier
@@ -64,16 +66,32 @@ fun PantallaControl(estado: EstadoSistema, onAbrir: (Int) -> Unit) {
                         color = TextoSecundario
                     )
                 }
-                OutlinedButton(
-                    onClick = { estado.apagarTodo() },
-                    enabled = encendidos > 0 && !bloqueado,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Peligro.copy(alpha = 0.7f)),
-                    shape = RoundedCornerShape(14.dp)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalAlignment = Alignment.End
                 ) {
-                    Icon(Icons.Filled.PowerSettingsNew, null, tint = Peligro,
-                        modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Apagar todo", color = Peligro)
+                    OutlinedButton(
+                        onClick = { confirmarTodo = true },
+                        enabled = apagados > 0 && !bloqueado,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Menta.copy(alpha = 0.7f)),
+                        shape = RoundedCornerShape(14.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Filled.PlayArrow, null, tint = Menta, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Encender todo", color = Menta)
+                    }
+                    OutlinedButton(
+                        onClick = { estado.apagarTodo() },
+                        enabled = encendidos > 0 && !bloqueado,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Peligro.copy(alpha = 0.7f)),
+                        shape = RoundedCornerShape(14.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Filled.PowerSettingsNew, null, tint = Peligro, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Apagar todo", color = Peligro)
+                    }
                 }
             }
         }
@@ -116,6 +134,28 @@ fun PantallaControl(estado: EstadoSistema, onAbrir: (Int) -> Unit) {
             d.nombre,
             onConfirmar = { estado.alternarDispositivo(d, true); porEncender = null },
             onCancelar = { porEncender = null }
+        )
+    }
+
+    if (confirmarTodo) {
+        AlertDialog(
+            onDismissRequest = { confirmarTodo = false },
+            containerColor = Superficie,
+            title = { Text("¿Encender todo?") },
+            text = {
+                Text("Se encenderán los $apagados dispositivos apagados. Asegúrate de que estén en buen estado y de que nadie los esté manipulando.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    estado.encenderTodo()
+                    confirmarTodo = false
+                }) { Text("Encender todo", color = Menta) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmarTodo = false }) {
+                    Text("Cancelar", color = TextoSecundario)
+                }
+            }
         )
     }
 
