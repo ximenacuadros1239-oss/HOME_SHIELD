@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.homeshieldai.ui.theme.*
 import java.util.Locale
+import androidx.compose.animation.AnimatedVisibility
 
 @Composable
 fun PantallaAjustes(estado: EstadoSistema, onCuenta: () -> Unit, onTarifa: () -> Unit) {
@@ -94,30 +95,30 @@ fun PantallaAjustes(estado: EstadoSistema, onCuenta: () -> Unit, onTarifa: () ->
                 onClick = onTarifa
             )
             DivisorAjuste()
-            FilaAjuste(
-                Icons.Filled.Payments, "Presupuesto mensual",
-                detalle = "Te avisamos cuando te acerques",
-                valor = "S/ %.0f".format(Locale.US, estado.presupuesto)
-            ) { dialogo = "presupuesto" }
+            FilaSliderAjuste(
+                Icons.Filled.Payments, "Presupuesto mensual", "Te avisamos cuando te acerques",
+                estado.presupuesto, 20f..300f, { "S/ %.0f".format(Locale.US, it) }, Menta,
+                onCambio = { estado.presupuesto = it },
+                onTerminado = { estado.guardarConfig() }
+            )
         }
 
         // ---------- Seguridad ----------
         TituloSeccion("Seguridad")
         TarjetaVidrio(modifier = Modifier.fillMaxWidth()) {
-            FilaAjuste(
-                Icons.Filled.Thermostat, "Temperatura de alerta",
-                detalle = "Avisa si el tablero la supera",
-                valor = "%.0f °C".format(Locale.US, estado.tempAlerta),
-                colorIcono = Ambar
-            ) { dialogo = "temp" }
+            FilaSliderAjuste(
+                Icons.Filled.Thermostat, "Temperatura de alerta", "Avisa si el tablero la supera",
+                estado.tempAlerta, 25f..60f, { "%.0f °C".format(Locale.US, it) }, Ambar,
+                onCambio = { estado.tempAlerta = it },
+                onTerminado = { estado.guardarConfig() }
+            )
             DivisorAjuste()
-            FilaAjuste(
-                Icons.Filled.Bolt, "Corriente de corte",
-                detalle = "Si se supera, se corta la energía",
-                valor = "%.1f A".format(Locale.US, estado.limiteCorriente),
-                colorIcono = Peligro
-            ) { dialogo = "corriente" }
-            DivisorAjuste()
+            FilaSliderAjuste(
+                Icons.Filled.Bolt, "Corriente de corte", "Si se supera, se corta la energía",
+                estado.limiteCorriente, 5f..32f, { "%.1f A".format(Locale.US, it) }, Peligro,
+                onCambio = { estado.limiteCorriente = it },
+                onTerminado = { estado.guardarConfig() }
+            )
             FilaAjuste(
                 Icons.Filled.Refresh, "Rearmar sistema",
                 detalle = when {
@@ -260,24 +261,6 @@ fun PantallaAjustes(estado: EstadoSistema, onCuenta: () -> Unit, onTarifa: () ->
         "hogar" -> DialogoEditar(
             "Nombre del hogar", estado.nombreHogar,
             { estado.nombreHogar = it; estado.guardarConfig(); dialogo = null },
-            { dialogo = null }
-        )
-        "presupuesto" -> DialogoSlider(
-            "Presupuesto mensual", estado.presupuesto, 20f..300f,
-            { "S/ %.0f".format(Locale.US, it) },
-            { estado.presupuesto = it; estado.guardarConfig(); dialogo = null },
-            { dialogo = null }
-        )
-        "temp" -> DialogoSlider(
-            "Temperatura de alerta", estado.tempAlerta, 25f..60f,
-            { "%.0f °C".format(Locale.US, it) },
-            { estado.tempAlerta = it; estado.guardarConfig(); dialogo = null },
-            { dialogo = null }
-        )
-        "corriente" -> DialogoSlider(
-            "Corriente de corte", estado.limiteCorriente, 5f..32f,
-            { "%.1f A".format(Locale.US, it) },
-            { estado.limiteCorriente = it; estado.guardarConfig(); dialogo = null },
             { dialogo = null }
         )
     }
@@ -486,6 +469,55 @@ fun SelectorTema(actual: ModoTema, onCambio: (ModoTema) -> Unit) {
                     style = MaterialTheme.typography.labelLarge,
                     color = if (activo) Fondo else TextoPrincipal
                 )
+            }
+        }
+    }
+}
+@Composable
+fun FilaSliderAjuste(
+    icono: ImageVector,
+    titulo: String,
+    detalle: String,
+    valor: Float,
+    rango: ClosedFloatingPointRange<Float>,
+    formato: (Float) -> String,
+    colorIcono: Color,
+    onCambio: (Float) -> Unit,
+    onTerminado: () -> Unit
+) {
+    var abierto by remember { mutableStateOf(false) }
+    Column {
+        FilaAjuste(
+            icono, titulo, detalle,
+            valor = formato(valor),
+            colorIcono = colorIcono,
+            onClick = { abierto = !abierto },
+            trailing = {
+                Icon(
+                    if (abierto) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                    null, tint = TextoSecundario
+                )
+            }
+        )
+        AnimatedVisibility(visible = abierto) {
+            Column(Modifier.padding(start = 50.dp, bottom = 6.dp)) {
+                Slider(
+                    value = valor,
+                    onValueChange = onCambio,
+                    onValueChangeFinished = onTerminado,
+                    valueRange = rango,
+                    colors = SliderDefaults.colors(
+                        thumbColor = TextoPrincipal,
+                        activeTrackColor = colorIcono,
+                        inactiveTrackColor = SuperficieAlta
+                    )
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(formato(rango.start), style = MaterialTheme.typography.bodyMedium,
+                        color = TextoSecundario)
+                    Text(formato(rango.endInclusive), style = MaterialTheme.typography.bodyMedium,
+                        color = TextoSecundario)
+                }
             }
         }
     }
