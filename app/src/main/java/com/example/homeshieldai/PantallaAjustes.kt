@@ -34,6 +34,7 @@ fun PantallaAjustes(estado: EstadoSistema, onCuenta: () -> Unit, onTarifa: () ->
     var confirmarSalir by remember { mutableStateOf(false) }
     var pruebas by remember { mutableStateOf(false) }
     var resultadoPrueba by remember { mutableStateOf<String?>(null) }
+    var toques by remember { mutableIntStateOf(0) }
 
     val permitido = remember(estado.ahora, resultadoPrueba) { permisoNotificaciones(context) }
     val lanzador = rememberLauncherForActivityResult(
@@ -207,11 +208,11 @@ fun PantallaAjustes(estado: EstadoSistema, onCuenta: () -> Unit, onTarifa: () ->
         }
 
         // ---------- Dispositivo ----------
-        TituloSeccion("Dispositivo")
+        TituloSeccion("Mi módulo")
         TarjetaVidrio(modifier = Modifier.fillMaxWidth()) {
             FilaAjuste(
-                Icons.Filled.Memory, "Controlador ESP32",
-                detalle = "ID: HS-ESP32-01",
+                Icons.Filled.Memory, "Módulo Home Shield",
+                detalle = "${estado.canalesTotales} tomas · ${estado.dispositivos.size} en uso",
                 trailing = {
                     if (estado.dispositivoConectado) EstadoPunto("Conectado", Menta)
                     else EstadoPunto("Sin conexión", Ambar)
@@ -219,30 +220,38 @@ fun PantallaAjustes(estado: EstadoSistema, onCuenta: () -> Unit, onTarifa: () ->
             )
         }
 
-        // ---------- Acerca de ----------
+// ---------- Acerca de ----------
         TituloSeccion("Acerca de")
         TarjetaVidrio(modifier = Modifier.fillMaxWidth()) {
-            FilaAjuste(Icons.Filled.Info, "Home Shield AI", valor = "v$version", colorIcono = TextoSecundario)
-            DivisorAjuste()
-            FilaSwitch(
-                Icons.Filled.Build, "Herramientas de prueba",
-                detalle = "Simula datos mientras no hay ESP32",
-                checked = pruebas
-            ) { pruebas = it }
-            if (pruebas) {
+            FilaAjuste(
+                Icons.Filled.Info, "Home Shield AI",
+                detalle = if (toques >= 7) "Modo demostración disponible" else "Versión $version",
+                colorIcono = TextoSecundario,
+                onClick = { toques++ },
+                trailing = {}
+            )
+            if (toques >= 7) {
                 DivisorAjuste()
-                FilaAjuste(Icons.Filled.Sensors, "Simular lecturas normales",
-                    detalle = "Quita la emergencia si la hay",
-                    onClick = { estado.simularLecturas() })
-                DivisorAjuste()
-                FilaAjuste(Icons.Filled.Warning, "Simular cortocircuito",
-                    detalle = "Corta los dispositivos y avisa",
-                    colorIcono = Peligro, onClick = { estado.simularCortocircuito() })
-                DivisorAjuste()
-                FilaAjuste(Icons.Filled.CloudOff, "Simular desconexión",
-                    detalle = if (estado.dispositivoConectado) "Deja de recibir lecturas"
-                    else "Volver a conectar",
-                    colorIcono = Ambar, onClick = { estado.alternarConexion() })
+                FilaSwitch(
+                    Icons.Filled.Build, "Modo demostración",
+                    detalle = "Simula datos mientras no hay módulo conectado",
+                    checked = pruebas
+                ) { pruebas = it }
+                if (pruebas) {
+                    DivisorAjuste()
+                    FilaAjuste(Icons.Filled.Sensors, "Simular lecturas normales",
+                        detalle = "Quita la emergencia si la hay",
+                        onClick = { estado.simularLecturas() })
+                    DivisorAjuste()
+                    FilaAjuste(Icons.Filled.Warning, "Simular cortocircuito",
+                        detalle = "Corta los aparatos y avisa",
+                        colorIcono = Peligro, onClick = { estado.simularCortocircuito() })
+                    DivisorAjuste()
+                    FilaAjuste(Icons.Filled.CloudOff, "Simular desconexión",
+                        detalle = if (estado.dispositivoConectado) "Deja de recibir lecturas"
+                        else "Volver a conectar",
+                        colorIcono = Ambar, onClick = { estado.alternarConexion() })
+                }
             }
         }
 

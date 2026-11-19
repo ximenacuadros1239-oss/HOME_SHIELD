@@ -1,8 +1,8 @@
 package com.example.homeshieldai
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,18 +19,20 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.homeshieldai.ui.theme.*
 import java.util.Locale
 
 @Composable
 fun PantallaControl(estado: EstadoSistema, onAbrir: (Int) -> Unit) {
-    var agregando by remember { mutableStateOf(false) }
+    var conectarEn by remember { mutableStateOf<Int?>(null) }
     var porEncender by remember { mutableStateOf<Dispositivo?>(null) }
-    val bloqueado = estado.emergencia || !estado.dispositivoConectado
-    val encendidos = estado.dispositivos.count { it.encendido }
     var confirmarTodo by remember { mutableStateOf(false) }
-    val apagados = estado.dispositivos.count { !it.encendido }
+    val bloqueado = estado.emergencia || !estado.dispositivoConectado
+    val total = estado.dispositivos.size
+    val encendidos = estado.dispositivos.count { it.encendido }
+    val apagados = total - encendidos
 
     Column(
         modifier = Modifier
@@ -39,7 +41,7 @@ fun PantallaControl(estado: EstadoSistema, onAbrir: (Int) -> Unit) {
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        CabeceraPantalla("Control", "Tus dispositivos conectados", estado)
+        CabeceraPantalla("Control", "Enciende y programa tus aparatos", estado)
 
         if (estado.emergencia) {
             Aviso(
@@ -53,76 +55,73 @@ fun PantallaControl(estado: EstadoSistema, onAbrir: (Int) -> Unit) {
             )
         }
 
-        TarjetaVidrio(modifier = Modifier.fillMaxWidth()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "$encendidos de ${estado.dispositivos.size} encendidos",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        "Consumo actual: %.0f W".format(Locale.US, estado.potencia),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextoSecundario
-                    )
-                }
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    horizontalAlignment = Alignment.End
-                ) {
-                    OutlinedButton(
-                        onClick = { confirmarTodo = true },
-                        enabled = apagados > 0 && !bloqueado,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Menta.copy(alpha = 0.7f)),
-                        shape = RoundedCornerShape(14.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Icon(Icons.Filled.PlayArrow, null, tint = Menta, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Encender todo", color = Menta)
+        if (total > 0) {
+            TarjetaVidrio(modifier = Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "$encendidos de $total encendidos",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            "Consumo actual: %.0f W".format(Locale.US, estado.potencia),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextoSecundario
+                        )
                     }
-                    OutlinedButton(
-                        onClick = { estado.apagarTodo() },
-                        enabled = encendidos > 0 && !bloqueado,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Peligro.copy(alpha = 0.7f)),
-                        shape = RoundedCornerShape(14.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalAlignment = Alignment.End
                     ) {
-                        Icon(Icons.Filled.PowerSettingsNew, null, tint = Peligro, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Apagar todo", color = Peligro)
+                        OutlinedButton(
+                            onClick = { confirmarTodo = true },
+                            enabled = apagados > 0 && !bloqueado,
+                            border = BorderStroke(1.dp, Menta.copy(alpha = 0.7f)),
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Filled.PlayArrow, null, tint = Menta,
+                                modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Encender todo", color = Menta)
+                        }
+                        OutlinedButton(
+                            onClick = { estado.apagarTodo() },
+                            enabled = encendidos > 0 && !bloqueado,
+                            border = BorderStroke(1.dp, Peligro.copy(alpha = 0.7f)),
+                            shape = RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Filled.PowerSettingsNew, null, tint = Peligro,
+                                modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Apagar todo", color = Peligro)
+                        }
                     }
                 }
             }
         }
 
-        estado.dispositivos.forEach { d ->
-            key(d.id) {
-                FilaDispositivo(
-                    d, estado.ahora, bloqueado,
-                    onAbrir = { onAbrir(d.id) },
-                    onCambio = { quiere ->
-                        if (quiere) porEncender = d else estado.alternarDispositivo(d, false)
-                    }
-                )
-            }
-        }
-
-        TarjetaVidrio(modifier = Modifier.fillMaxWidth(), onClick = { agregando = true }) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Filled.Add, null, tint = Menta)
-                Spacer(Modifier.width(8.dp))
-                Text("Agregar dispositivo", style = MaterialTheme.typography.titleMedium,
-                    color = Menta)
+        TituloSeccion("Tomas del módulo")
+        (1..estado.canalesTotales).forEach { canal ->
+            val d = estado.dispositivoEnCanal(canal)
+            if (d != null) {
+                key(d.id) {
+                    FilaDispositivo(
+                        d, estado.ahora, bloqueado,
+                        onAbrir = { onAbrir(d.id) },
+                        onCambio = { quiere ->
+                            if (quiere) porEncender = d else estado.alternarDispositivo(d, false)
+                        }
+                    )
+                }
+            } else {
+                FilaTomaLibre(canal) { conectarEn = canal }
             }
         }
 
         Text(
-            "Cada dispositivo usa un canal del módulo de relés. El consumo individual es una estimación; el medidor mide el total de la casa.",
+            "Cada aparato se enchufa a una toma del módulo. El consumo por aparato es aproximado; el medidor mide el total de tu casa.",
             style = MaterialTheme.typography.bodyMedium,
             color = TextoSecundario,
             modifier = Modifier.padding(horizontal = 4.dp)
@@ -137,13 +136,24 @@ fun PantallaControl(estado: EstadoSistema, onAbrir: (Int) -> Unit) {
         )
     }
 
+    conectarEn?.let { canal ->
+        HojaConectarAparato(
+            canal = canal,
+            onConectar = { nombre, tipo, potencia ->
+                estado.conectarAparato(canal, nombre, tipo, potencia)
+                conectarEn = null
+            },
+            onCerrar = { conectarEn = null }
+        )
+    }
+
     if (confirmarTodo) {
         AlertDialog(
             onDismissRequest = { confirmarTodo = false },
             containerColor = Superficie,
             title = { Text("¿Encender todo?") },
             text = {
-                Text("Se encenderán los $apagados dispositivos apagados. Asegúrate de que estén en buen estado y de que nadie los esté manipulando.")
+                Text("Se encenderán los $apagados aparatos apagados. Asegúrate de que estén en buen estado y de que nadie los esté manipulando.")
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -156,16 +166,6 @@ fun PantallaControl(estado: EstadoSistema, onAbrir: (Int) -> Unit) {
                     Text("Cancelar", color = TextoSecundario)
                 }
             }
-        )
-    }
-
-    if (agregando) {
-        DialogoAgregarDispositivo(
-            onAgregar = { nombre, tipo, canal, potencia ->
-                estado.agregarDispositivo(nombre, tipo, canal, potencia)
-                agregando = false
-            },
-            onCancelar = { agregando = false }
         )
     }
 }
@@ -194,6 +194,31 @@ fun coloresSwitch() = SwitchDefaults.colors(
 )
 
 @Composable
+fun FilaTomaLibre(canal: Int, onClick: () -> Unit) {
+    TarjetaVidrio(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(SuperficieAlta),
+                contentAlignment = Alignment.Center
+            ) { Icon(Icons.Filled.Add, null, tint = Menta) }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Toma $canal", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Libre · toca para conectar un aparato",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextoSecundario
+                )
+            }
+            Icon(Icons.Filled.ChevronRight, null, tint = TextoSecundario)
+        }
+    }
+}
+
+@Composable
 fun FilaDispositivo(
     d: Dispositivo,
     ahora: Long,
@@ -220,7 +245,7 @@ fun FilaDispositivo(
             Column(Modifier.weight(1f)) {
                 Text(d.nombre, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Canal ${d.canal} · ${d.potenciaW} W",
+                    "Toma ${d.canal} · ~${d.potenciaW} W",
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextoSecundario
                 )
@@ -297,66 +322,112 @@ fun DialogoConfirmarEncender(nombre: String, onConfirmar: () -> Unit, onCancelar
 }
 
 @Composable
-fun DialogoAgregarDispositivo(
-    onAgregar: (String, TipoDispositivo, Int, Int) -> Unit,
-    onCancelar: () -> Unit
+private fun TileTipo(
+    tipo: TipoDispositivo,
+    activo: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
 ) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (activo) Menta.copy(alpha = 0.2f) else SuperficieAlta)
+            .clickable { onClick() }
+            .padding(vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            tipo.icono, null,
+            tint = if (activo) Menta else TextoSecundario,
+            modifier = Modifier.size(28.dp)
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            tipo.etiqueta,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (activo) Menta else TextoPrincipal,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HojaConectarAparato(
+    canal: Int,
+    onConectar: (String, TipoDispositivo, Int) -> Unit,
+    onCerrar: () -> Unit
+) {
+    var tipo by remember { mutableStateOf<TipoDispositivo?>(null) }
     var nombre by remember { mutableStateOf("") }
-    var tipo by remember { mutableStateOf(TipoDispositivo.OTRO) }
-    var canal by remember { mutableIntStateOf(1) }
     var potencia by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
 
-    AlertDialog(
-        onDismissRequest = onCancelar,
-        containerColor = Superficie,
-        title = { Text("Nuevo dispositivo") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    ModalBottomSheet(onDismissRequest = onCerrar, containerColor = Superficie) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 28.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Conectar a la toma $canal", style = MaterialTheme.typography.titleLarge)
+            Text(
+                "¿Qué aparato vas a enchufar en esta toma?",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextoSecundario
+            )
+
+            TipoDispositivo.values().toList().chunked(3).forEach { fila ->
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    fila.forEach { t ->
+                        TileTipo(t, t == tipo, Modifier.weight(1f)) {
+                            tipo = t
+                            nombre = t.etiqueta
+                            potencia = t.potenciaTipica.toString()
+                            error = null
+                        }
+                    }
+                    repeat(3 - fila.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+
+            if (tipo != null) {
                 OutlinedTextField(
                     value = nombre,
                     onValueChange = { nombre = it; error = null },
                     label = { Text("Nombre") },
-                    singleLine = true
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
-                Text("Tipo", style = MaterialTheme.typography.bodyMedium, color = TextoSecundario)
-                Row(
-                    Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    TipoDispositivo.values().forEach {
-                        ChipOpcion(it.etiqueta, it == tipo) { tipo = it }
-                    }
-                }
-                Text("Canal del relé", style = MaterialTheme.typography.bodyMedium,
-                    color = TextoSecundario)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    (1..4).forEach { ChipOpcion("$it", it == canal) { canal = it } }
-                }
                 OutlinedTextField(
                     value = potencia,
                     onValueChange = { potencia = it.filter(Char::isDigit).take(5); error = null },
-                    label = { Text("Potencia estimada (W)") },
+                    label = { Text("Consumo aproximado (W)") },
+                    supportingText = {
+                        Text("Sirve para estimar el gasto. Puedes cambiarlo si lo conoces.")
+                    },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
                 )
                 error?.let {
                     Text(it, color = Peligro, style = MaterialTheme.typography.bodyMedium)
                 }
+                Button(
+                    onClick = {
+                        val w = potencia.toIntOrNull()
+                        when {
+                            nombre.isBlank() -> error = "Escribe un nombre"
+                            w == null || w <= 0 -> error = "Indica el consumo en watts"
+                            else -> onConectar(nombre.trim(), tipo!!, w)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Menta, contentColor = Fondo),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
+                ) { Text("Conectar a la toma $canal", style = MaterialTheme.typography.titleMedium) }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                val w = potencia.toIntOrNull()
-                when {
-                    nombre.isBlank() -> error = "Escribe un nombre"
-                    w == null || w <= 0 -> error = "Indica la potencia en watts"
-                    else -> onAgregar(nombre.trim(), tipo, canal, w)
-                }
-            }) { Text("Agregar", color = Menta) }
-        },
-        dismissButton = {
-            TextButton(onClick = onCancelar) { Text("Cancelar", color = TextoSecundario) }
         }
-    )
+    }
 }

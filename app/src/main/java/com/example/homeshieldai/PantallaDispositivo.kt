@@ -228,14 +228,8 @@ fun PantallaDispositivo(estado: EstadoSistema, id: Int, onVolver: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(14.dp))
-            Text("Canal del relé", style = MaterialTheme.typography.bodyMedium,
-                color = TextoSecundario)
-            Spacer(Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                (1..4).forEach { n ->
-                    ChipOpcion("$n", n == d.canal) { d.canal = n }
-                }
-            }
+            Text("Conexión", style = MaterialTheme.typography.bodyMedium, color = TextoSecundario)
+            Text("Toma ${d.canal} del módulo", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(14.dp))
             Row(
                 Modifier.fillMaxWidth().clickable { editarPotencia = true },
@@ -258,7 +252,7 @@ fun PantallaDispositivo(estado: EstadoSistema, id: Int, onVolver: () -> Unit) {
         ) {
             Icon(Icons.Filled.Delete, null, tint = Peligro)
             Spacer(Modifier.width(8.dp))
-            Text("Eliminar dispositivo", color = Peligro,
+            Text("Quitar de la toma ${d.canal}", color = Peligro,
                 style = MaterialTheme.typography.titleMedium)
         }
         Spacer(Modifier.height(8.dp))
@@ -293,13 +287,13 @@ fun PantallaDispositivo(estado: EstadoSistema, id: Int, onVolver: () -> Unit) {
         AlertDialog(
             onDismissRequest = { confirmarEliminar = false },
             containerColor = Superficie,
-            title = { Text("¿Eliminar ${d.nombre}?") },
-            text = { Text("Se quitará de la lista y se perderá su programación.") },
+            title = { Text("¿Quitar ${d.nombre} de la toma ${d.canal}?") },
+            text = { Text("La toma quedará libre y se perderá la programación de este aparato.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmarEliminar = false
-                    estado.eliminarDispositivo(d)
-                }) { Text("Eliminar", color = Peligro) }
+                    estado.desvincular(d)
+                }) { Text("Quitar", color = Peligro) }
             },
             dismissButton = {
                 TextButton(onClick = { confirmarEliminar = false }) {

@@ -95,6 +95,10 @@ class EstadoSistema : ViewModel() {
         Dispositivo(2, "Ventilador", TipoDispositivo.VENTILADOR, 2, 60, false)
     )
     private var proximoId = 3
+    /** Tomas que trae el módulo de relés. Con el hardware real saldrá del dispositivo. */
+    val canalesTotales = 4
+
+    fun dispositivoEnCanal(canal: Int): Dispositivo? = dispositivos.firstOrNull { it.canal == canal }
     val releEncendido: Boolean get() = dispositivos.any { it.encendido }
     fun dispositivo(id: Int): Dispositivo? = dispositivos.firstOrNull { it.id == id }
 
@@ -340,12 +344,23 @@ class EstadoSistema : ViewModel() {
         d.apagarEnMs = if (minutos > 0) System.currentTimeMillis() + minutos * 60_000L else 0L
     }
 
-    fun agregarDispositivo(nombre: String, tipo: TipoDispositivo, canal: Int, potencia: Int) {
+    fun conectarAparato(canal: Int, nombre: String, tipo: TipoDispositivo, potencia: Int) {
+        if (canal !in 1..canalesTotales || dispositivoEnCanal(canal) != null) return
         dispositivos.add(Dispositivo(proximoId++, nombre, tipo, canal, potencia))
+        agregarAlerta(
+            "Aparato conectado",
+            "Conectaste $nombre a la toma $canal.",
+            Categoria.GENERAL, Tono.INFO, Icons.Filled.Info
+        )
     }
 
-    fun eliminarDispositivo(d: Dispositivo) {
+    fun desvincular(d: Dispositivo) {
         dispositivos.remove(d)
+        agregarAlerta(
+            "Aparato desvinculado",
+            "${d.nombre} ya no está asignado a la toma ${d.canal}. La toma quedó libre.",
+            Categoria.GENERAL, Tono.INFO, Icons.Filled.Info
+        )
     }
 
     // ---------- Emergencia ----------

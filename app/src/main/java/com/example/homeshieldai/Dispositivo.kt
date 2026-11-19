@@ -2,19 +2,27 @@ package com.example.homeshieldai
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Air
+import androidx.compose.material.icons.filled.Computer
+import androidx.compose.material.icons.filled.Kitchen
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Power
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.vector.ImageVector
 
-enum class TipoDispositivo(val etiqueta: String, val icono: ImageVector) {
-    ESTUFA("Estufa", Icons.Filled.LocalFireDepartment),
-    VENTILADOR("Ventilador", Icons.Filled.Air),
-    LUZ("Luz", Icons.Filled.Lightbulb),
-    TERMA("Terma", Icons.Filled.WaterDrop),
-    OTRO("Otro", Icons.Filled.Power)
+enum class TipoDispositivo(val etiqueta: String, val icono: ImageVector, val potenciaTipica: Int) {
+    ESTUFA("Estufa", Icons.Filled.LocalFireDepartment, 1500),
+    TERMA("Terma", Icons.Filled.WaterDrop, 1500),
+    VENTILADOR("Ventilador", Icons.Filled.Air, 60),
+    LUZ("Luz", Icons.Filled.Lightbulb, 15),
+    TV("Televisor", Icons.Filled.Tv, 100),
+    REFRIGERADORA("Refrigeradora", Icons.Filled.Kitchen, 150),
+    COMPUTADORA("Computadora", Icons.Filled.Computer, 120),
+    CARGADOR("Cargador", Icons.Filled.PhoneAndroid, 20),
+    OTRO("Otro aparato", Icons.Filled.Power, 100)
 }
 
 class Dispositivo(
