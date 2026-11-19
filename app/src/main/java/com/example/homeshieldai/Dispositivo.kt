@@ -1,15 +1,7 @@
 package com.example.homeshieldai
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Air
-import androidx.compose.material.icons.filled.Computer
-import androidx.compose.material.icons.filled.Kitchen
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material.icons.filled.Power
-import androidx.compose.material.icons.filled.Tv
-import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -25,19 +17,21 @@ enum class TipoDispositivo(val etiqueta: String, val icono: ImageVector, val pot
     OTRO("Otro aparato", Icons.Filled.Power, 100)
 }
 
+/** El canal lo define el módulo (hardware); la persona solo elige nombre e ícono. */
 class Dispositivo(
     val id: Int,
     nombre: String,
     tipo: TipoDispositivo,
-    canal: Int,
+    val canal: Int,
     potenciaW: Int,
-    encendido: Boolean = false
+    encendido: Boolean = false,
+    configurado: Boolean = true
 ) {
     var nombre by mutableStateOf(nombre)
     var tipo by mutableStateOf(tipo)
-    var canal by mutableIntStateOf(canal)
     var potenciaW by mutableIntStateOf(potenciaW)
     var encendido by mutableStateOf(encendido)
+    var configurado by mutableStateOf(configurado)
 
     // Temporizador: hora (en ms) en que se apagará. 0 = sin temporizador
     var apagarEnMs by mutableLongStateOf(0L)

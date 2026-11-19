@@ -55,7 +55,6 @@ fun PantallaDispositivo(estado: EstadoSistema, id: Int, onVolver: () -> Unit) {
     var editarPotencia by remember { mutableStateOf(false) }
     var dialogoHora by remember { mutableStateOf<String?>(null) }
     var confirmarEncender by remember { mutableStateOf(false) }
-    var confirmarEliminar by remember { mutableStateOf(false) }
 
     val d = estado.dispositivo(id)
     if (d == null) {
@@ -228,8 +227,7 @@ fun PantallaDispositivo(estado: EstadoSistema, id: Int, onVolver: () -> Unit) {
                 }
             }
             Spacer(Modifier.height(14.dp))
-            Text("Conexión", style = MaterialTheme.typography.bodyMedium, color = TextoSecundario)
-            Text("Toma ${d.canal} del módulo", style = MaterialTheme.typography.titleMedium)
+
             Spacer(Modifier.height(14.dp))
             Row(
                 Modifier.fillMaxWidth().clickable { editarPotencia = true },
@@ -244,18 +242,7 @@ fun PantallaDispositivo(estado: EstadoSistema, id: Int, onVolver: () -> Unit) {
             }
         }
 
-        OutlinedButton(
-            onClick = { confirmarEliminar = true },
-            border = BorderStroke(1.dp, Peligro.copy(alpha = 0.7f)),
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth().height(52.dp)
-        ) {
-            Icon(Icons.Filled.Delete, null, tint = Peligro)
-            Spacer(Modifier.width(8.dp))
-            Text("Quitar de la toma ${d.canal}", color = Peligro,
-                style = MaterialTheme.typography.titleMedium)
-        }
-        Spacer(Modifier.height(8.dp))
+
     }
 
     if (editarNombre) {
@@ -281,25 +268,6 @@ fun PantallaDispositivo(estado: EstadoSistema, id: Int, onVolver: () -> Unit) {
             d.nombre,
             onConfirmar = { estado.alternarDispositivo(d, true); confirmarEncender = false },
             onCancelar = { confirmarEncender = false }
-        )
-    }
-    if (confirmarEliminar) {
-        AlertDialog(
-            onDismissRequest = { confirmarEliminar = false },
-            containerColor = Superficie,
-            title = { Text("¿Quitar ${d.nombre} de la toma ${d.canal}?") },
-            text = { Text("La toma quedará libre y se perderá la programación de este aparato.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmarEliminar = false
-                    estado.desvincular(d)
-                }) { Text("Quitar", color = Peligro) }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmarEliminar = false }) {
-                    Text("Cancelar", color = TextoSecundario)
-                }
-            }
         )
     }
 }

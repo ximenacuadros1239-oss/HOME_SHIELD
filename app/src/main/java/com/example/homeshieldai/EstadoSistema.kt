@@ -95,10 +95,7 @@ class EstadoSistema : ViewModel() {
         Dispositivo(2, "Ventilador", TipoDispositivo.VENTILADOR, 2, 60, false)
     )
     private var proximoId = 3
-    /** Tomas que trae el módulo de relés. Con el hardware real saldrá del dispositivo. */
-    val canalesTotales = 4
 
-    fun dispositivoEnCanal(canal: Int): Dispositivo? = dispositivos.firstOrNull { it.canal == canal }
     val releEncendido: Boolean get() = dispositivos.any { it.encendido }
     fun dispositivo(id: Int): Dispositivo? = dispositivos.firstOrNull { it.id == id }
 
@@ -303,6 +300,7 @@ class EstadoSistema : ViewModel() {
 
     // ---------- Control de dispositivos ----------
     fun alternarDispositivo(d: Dispositivo, encender: Boolean) {
+        if (!d.configurado) return
         if (emergencia || !dispositivoConectado) return
         d.encendido = encender
         if (!encender) d.apagarEnMs = 0L
@@ -330,7 +328,7 @@ class EstadoSistema : ViewModel() {
 
     fun encenderTodo() {
         if (emergencia || !dispositivoConectado) return
-        val apagados = dispositivos.filter { !it.encendido }
+        val apagados = dispositivos.filter { !it.encendido && it.configurado }
         if (apagados.isEmpty()) return
         apagados.forEach { it.encendido = true }
         agregarAlerta(
@@ -344,22 +342,32 @@ class EstadoSistema : ViewModel() {
         d.apagarEnMs = if (minutos > 0) System.currentTimeMillis() + minutos * 60_000L else 0L
     }
 
-    fun conectarAparato(canal: Int, nombre: String, tipo: TipoDispositivo, potencia: Int) {
-        if (canal !in 1..canalesTotales || dispositivoEnCanal(canal) != null) return
-        dispositivos.add(Dispositivo(proximoId++, nombre, tipo, canal, potencia))
-        agregarAlerta(
-            "Aparato conectado",
-            "Conectaste $nombre a la toma $canal.",
-            Categoria.GENERAL, Tono.INFO, Icons.Filled.Info
-        )
+    fun configurarDispositivo(d: Dispositivo, nombre: String, tipo: TipoDispositivo, potencia: Int) {
+        val eraNuevo = !d.configurado
+        d.nombre = nombre
+        d.tipo = tipo
+        d.potenciaW = potencia
+        d.configurado = true
+        if (eraNuevo) {
+            agregarAlerta(
+                "Dispositivo agregado",
+                "$nombre ya está listo para usarse desde la app.",
+                Categoria.GENERAL, Tono.INFO, Icons.Filled.Info
+            )
+        }
     }
 
-    fun desvincular(d: Dispositivo) {
-        dispositivos.remove(d)
+    /** Demostración: hace lo que hará el módulo cuando detecte un dispositivo nuevo. */
+    fun simularDispositivoNuevo() {
+        val canal = (dispositivos.maxOfOrNull { it.canal } ?: 0) + 1
+        dispositivos.add(
+            Dispositivo(proximoId++, "Dispositivo nuevo", TipoDispositivo.OTRO, canal, 100, false, false)
+        )
         agregarAlerta(
-            "Aparato desvinculado",
-            "${d.nombre} ya no está asignado a la toma ${d.canal}. La toma quedó libre.",
-            Categoria.GENERAL, Tono.INFO, Icons.Filled.Info
+            "Dispositivo nuevo detectado",
+            "Tu módulo detectó un dispositivo nuevo. Dile qué aparato es para poder usarlo.",
+            Categoria.GENERAL, Tono.INFO, Icons.Filled.Info,
+            notificar = true
         )
     }
 

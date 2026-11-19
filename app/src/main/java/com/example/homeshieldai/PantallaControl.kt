@@ -26,13 +26,13 @@ import java.util.Locale
 
 @Composable
 fun PantallaControl(estado: EstadoSistema, onAbrir: (Int) -> Unit) {
-    var conectarEn by remember { mutableStateOf<Int?>(null) }
+    var configurando by remember { mutableStateOf<Dispositivo?>(null) }
     var porEncender by remember { mutableStateOf<Dispositivo?>(null) }
     var confirmarTodo by remember { mutableStateOf(false) }
     val bloqueado = estado.emergencia || !estado.dispositivoConectado
-    val total = estado.dispositivos.size
-    val encendidos = estado.dispositivos.count { it.encendido }
-    val apagados = total - encendidos
+    val listos = estado.dispositivos.filter { it.configurado }
+    val encendidos = listos.count { it.encendido }
+    val apagados = listos.size - encendidos
 
     Column(
         modifier = Modifier
@@ -55,12 +55,12 @@ fun PantallaControl(estado: EstadoSistema, onAbrir: (Int) -> Unit) {
             )
         }
 
-        if (total > 0) {
+        if (listos.isNotEmpty()) {
             TarjetaVidrio(modifier = Modifier.fillMaxWidth()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            "$encendidos de $total encendidos",
+                            "$encendidos de ${listos.size} encendidos",
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
@@ -102,26 +102,28 @@ fun PantallaControl(estado: EstadoSistema, onAbrir: (Int) -> Unit) {
             }
         }
 
-        TituloSeccion("Tomas del módulo")
-        (1..estado.canalesTotales).forEach { canal ->
-            val d = estado.dispositivoEnCanal(canal)
-            if (d != null) {
+        if (estado.dispositivos.isEmpty()) {
+            EstadoSinDispositivos()
+        } else {
+            estado.dispositivos.forEach { d ->
                 key(d.id) {
-                    FilaDispositivo(
-                        d, estado.ahora, bloqueado,
-                        onAbrir = { onAbrir(d.id) },
-                        onCambio = { quiere ->
-                            if (quiere) porEncender = d else estado.alternarDispositivo(d, false)
-                        }
-                    )
+                    if (d.configurado) {
+                        FilaDispositivo(
+                            d, estado.ahora, bloqueado,
+                            onAbrir = { onAbrir(d.id) },
+                            onCambio = { quiere ->
+                                if (quiere) porEncender = d else estado.alternarDispositivo(d, false)
+                            }
+                        )
+                    } else {
+                        TarjetaDispositivoNuevo { configurando = d }
+                    }
                 }
-            } else {
-                FilaTomaLibre(canal) { conectarEn = canal }
             }
         }
 
         Text(
-            "Cada aparato se enchufa a una toma del módulo. El consumo por aparato es aproximado; el medidor mide el total de tu casa.",
+            "Tu módulo Home Shield detecta los dispositivos conectados y los muestra aquí. El consumo de cada aparato es aproximado; el medidor mide el total de tu casa.",
             style = MaterialTheme.typography.bodyMedium,
             color = TextoSecundario,
             modifier = Modifier.padding(horizontal = 4.dp)
@@ -136,14 +138,13 @@ fun PantallaControl(estado: EstadoSistema, onAbrir: (Int) -> Unit) {
         )
     }
 
-    conectarEn?.let { canal ->
-        HojaConectarAparato(
-            canal = canal,
-            onConectar = { nombre, tipo, potencia ->
-                estado.conectarAparato(canal, nombre, tipo, potencia)
-                conectarEn = null
+    configurando?.let { d ->
+        HojaConfigurarDispositivo(
+            onGuardar = { nombre, tipo, potencia ->
+                estado.configurarDispositivo(d, nombre, tipo, potencia)
+                configurando = null
             },
-            onCerrar = { conectarEn = null }
+            onCerrar = { configurando = null }
         )
     }
 
@@ -194,21 +195,47 @@ fun coloresSwitch() = SwitchDefaults.colors(
 )
 
 @Composable
-fun FilaTomaLibre(canal: Int, onClick: () -> Unit) {
-    TarjetaVidrio(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
+fun EstadoSinDispositivos() {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(Icons.Filled.Sensors, null, tint = Menta, modifier = Modifier.size(64.dp))
+        Spacer(Modifier.height(12.dp))
+        Text("Aún no hay dispositivos", style = MaterialTheme.typography.titleLarge)
+        Text(
+            "Cuando tu módulo Home Shield detecte uno, aparecerá aquí para que lo configures.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextoSecundario,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp)
+        )
+    }
+}
+
+@Composable
+fun TarjetaDispositivoNuevo(onClick: () -> Unit) {
+    TarjetaVidrio(
+        modifier = Modifier.fillMaxWidth(),
+        colorBorde = Menta.copy(alpha = 0.6f),
+        fondo = Brush.verticalGradient(
+            listOf(Menta.copy(alpha = 0.18f), Menta.copy(alpha = 0.06f))
+        ),
+        onClick = onClick
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
                     .size(48.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(SuperficieAlta),
+                    .background(MentaOscuro.copy(alpha = 0.6f)),
                 contentAlignment = Alignment.Center
-            ) { Icon(Icons.Filled.Add, null, tint = Menta) }
+            ) { Icon(Icons.Filled.Sensors, null, tint = Menta) }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("Toma $canal", style = MaterialTheme.typography.titleMedium)
+                Text("Dispositivo nuevo detectado", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Libre · toca para conectar un aparato",
+                    "Toca para decirnos qué aparato es y poder usarlo.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextoSecundario
                 )
@@ -244,12 +271,7 @@ fun FilaDispositivo(
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(d.nombre, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Toma ${d.canal} · ~${d.potenciaW} W",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextoSecundario
-                )
-                if (d.encendido) EstadoPunto("Encendido", Menta)
+                if (d.encendido) EstadoPunto("Encendido · ~${d.potenciaW} W", Menta)
                 else EstadoPunto("Apagado", TextoSecundario)
                 if (d.apagarEnMs > 0) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -353,9 +375,8 @@ private fun TileTipo(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HojaConectarAparato(
-    canal: Int,
-    onConectar: (String, TipoDispositivo, Int) -> Unit,
+fun HojaConfigurarDispositivo(
+    onGuardar: (String, TipoDispositivo, Int) -> Unit,
     onCerrar: () -> Unit
 ) {
     var tipo by remember { mutableStateOf<TipoDispositivo?>(null) }
@@ -371,9 +392,9 @@ fun HojaConectarAparato(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Conectar a la toma $canal", style = MaterialTheme.typography.titleLarge)
+            Text("¿Qué aparato es?", style = MaterialTheme.typography.titleLarge)
             Text(
-                "¿Qué aparato vas a enchufar en esta toma?",
+                "Tu módulo detectó un dispositivo nuevo. Elígelo para poder encenderlo y estimar su consumo.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextoSecundario
             )
@@ -420,13 +441,13 @@ fun HojaConectarAparato(
                         when {
                             nombre.isBlank() -> error = "Escribe un nombre"
                             w == null || w <= 0 -> error = "Indica el consumo en watts"
-                            else -> onConectar(nombre.trim(), tipo!!, w)
+                            else -> onGuardar(nombre.trim(), tipo!!, w)
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Menta, contentColor = Fondo),
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth().height(52.dp)
-                ) { Text("Conectar a la toma $canal", style = MaterialTheme.typography.titleMedium) }
+                ) { Text("Guardar", style = MaterialTheme.typography.titleMedium) }
             }
         }
     }

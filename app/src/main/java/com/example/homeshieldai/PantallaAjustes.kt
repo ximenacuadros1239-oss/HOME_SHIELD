@@ -212,7 +212,7 @@ fun PantallaAjustes(estado: EstadoSistema, onCuenta: () -> Unit, onTarifa: () ->
         TarjetaVidrio(modifier = Modifier.fillMaxWidth()) {
             FilaAjuste(
                 Icons.Filled.Memory, "Módulo Home Shield",
-                detalle = "${estado.canalesTotales} tomas · ${estado.dispositivos.size} en uso",
+                detalle = "${estado.dispositivos.size} dispositivos detectados",
                 trailing = {
                     if (estado.dispositivoConectado) EstadoPunto("Conectado", Menta)
                     else EstadoPunto("Sin conexión", Ambar)
@@ -253,6 +253,12 @@ fun PantallaAjustes(estado: EstadoSistema, onCuenta: () -> Unit, onTarifa: () ->
                         colorIcono = Ambar, onClick = { estado.alternarConexion() })
                 }
             }
+            DivisorAjuste()
+            FilaAjuste(
+                Icons.Filled.AddCircle, "Simular dispositivo nuevo",
+                detalle = "Como cuando el módulo detecta uno",
+                onClick = { estado.simularDispositivoNuevo() }
+            )
         }
 
         TarjetaVidrio(
