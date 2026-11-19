@@ -83,9 +83,11 @@ fun PantallaAjustes(estado: EstadoSistema, onCuenta: () -> Unit, onTarifa: () ->
         // ---------- Mi hogar ----------
         TituloSeccion("Mi hogar")
         TarjetaVidrio(modifier = Modifier.fillMaxWidth()) {
-            FilaAjuste(Icons.Filled.Home, "Nombre del hogar", valor = estado.nombreHogar) {
-                dialogo = "hogar"
-            }
+            FilaAjuste(
+                Icons.Filled.Home, "Nombre del hogar",
+                valor = estado.nombreHogar,
+                onClick = { dialogo = "hogar" }
+            )
             DivisorAjuste()
             FilaAjuste(
                 Icons.Filled.Receipt, "Tarifa eléctrica",
