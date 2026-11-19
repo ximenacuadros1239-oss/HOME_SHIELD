@@ -33,6 +33,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.random.Random
+import androidx.lifecycle.ViewModel
 
 fun formatoFecha(ts: Long): String {
     val hoy = Calendar.getInstance()
@@ -44,8 +45,15 @@ fun formatoFecha(ts: Long): String {
     else SimpleDateFormat("dd MMM, HH:mm", Locale("es", "PE")).format(Date(ts))
 }
 
-class EstadoSistema {
+class EstadoSistema : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
+    override fun onCleared() {
+        alCambiarTema = null
+        alGuardarTarifa = null
+        alGuardarConfig = null
+        alAlerta = null
+        super.onCleared()
+    }
 
     // ---------- Cuenta ----------
     var sesionIniciada by mutableStateOf(auth.currentUser != null)

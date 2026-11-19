@@ -43,6 +43,9 @@ import androidx.navigation.navArgument
 import com.example.homeshieldai.ui.theme.*
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 data class Destino(val ruta: String, val titulo: String, val icono: ImageVector)
 
@@ -56,17 +59,22 @@ val destinos = listOf(
 
 @Composable
 fun HomeShieldApp() {
-    val context = LocalContext.current
-    val estado = remember {
-        EstadoSistema().also { e ->
-            e.modoTema = leerModoTema(context)
-            e.alCambiarTema = { guardarModoTema(context, it) }
-            cargarTarifa(context, e)
-            e.alGuardarTarifa = { guardarTarifa(context, e) }
-            cargarAjustes(context, e)
-            e.alGuardarConfig = { guardarAjustes(context, e) }
+    val context = LocalContext.current.applicationContext
+    val estado: EstadoSistema = viewModel(
+        factory = object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                val e = EstadoSistema()
+                e.modoTema = leerModoTema(context)
+                e.alCambiarTema = { guardarModoTema(context, it) }
+                cargarTarifa(context, e)
+                e.alGuardarTarifa = { guardarTarifa(context, e) }
+                cargarAjustes(context, e)
+                e.alGuardarConfig = { guardarAjustes(context, e) }
+                @Suppress("UNCHECKED_CAST")
+                return e as T
+            }
         }
-    }
+    )
     HomeShieldAITheme(estado.modoTema) {
         if (!estado.sesionIniciada) {
             PantallaLogin(estado)
@@ -96,9 +104,10 @@ fun AppPrincipal(estado: EstadoSistema) {
     ) { }
 
     LaunchedEffect(Unit) {
-        crearCanalesNotificacion(context)
+        val appContext = context.applicationContext
+        crearCanalesNotificacion(appContext)
         estado.alAlerta = { titulo, mensaje, tono ->
-            mostrarNotificacion(context, titulo, mensaje, tono)
+            mostrarNotificacion(appContext, titulo, mensaje, tono)
         }
         if (Build.VERSION.SDK_INT >= 33) {
             lanzadorPermiso.launch(Manifest.permission.POST_NOTIFICATIONS)
