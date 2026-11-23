@@ -20,10 +20,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.homeshieldai.ui.theme.*
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 enum class Categoria { TEMPERATURA, ELECTRICA, GENERAL }
 
 enum class Tono { NORMAL, PRECAUCION, PELIGRO, INFO }
+
+enum class AccionAlerta(val etiqueta: String) {
+    VER_CONSUMO("Ver mi consumo"),
+    VER_TABLERO("Ver temperatura del tablero"),
+    IR_AJUSTES("Ir a Ajustes"),
+    VER_CONTROL("Ir a Control")
+}
 
 @Composable
 fun Tono.color(): Color = when (this) {
@@ -40,15 +50,24 @@ data class Alerta(
     val categoria: Categoria,
     val tono: Tono,
     val icono: ImageVector,
-    val id: Long = System.nanoTime()
+    val id: Long = System.nanoTime(),
+    val ts: Long = System.currentTimeMillis(),
+    val accion: AccionAlerta? = null,
+    val consejo: String? = null
 )
 
 val filtros = listOf("Todas", "Temperatura", "Eléctrica")
 
+fun fechaCompleta(ts: Long): String =
+    SimpleDateFormat("EEEE d 'de' MMMM, HH:mm", Locale("es", "PE"))
+        .format(Date(ts))
+        .replaceFirstChar { it.uppercase() }
+
 @Composable
-fun PantallaAlertas(estado: EstadoSistema) {
+fun PantallaAlertas(estado: EstadoSistema, onAccion: (AccionAlerta) -> Unit) {
     var filtro by remember { mutableIntStateOf(0) }
     var confirmarBorrado by remember { mutableStateOf(false) }
+    var abierta by remember { mutableStateOf<Alerta?>(null) }
     val lista = when (filtro) {
         1 -> estado.alertas.filter { it.categoria == Categoria.TEMPERATURA }
         2 -> estado.alertas.filter { it.categoria == Categoria.ELECTRICA }
@@ -81,17 +100,36 @@ fun PantallaAlertas(estado: EstadoSistema) {
             EstadoVacio()
         } else {
             Text(
-                "Desliza una alerta para borrarla",
+                "Toca una alerta para ver el detalle. Desliza para borrarla.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextoSecundario,
                 modifier = Modifier.padding(start = 4.dp)
             )
             lista.forEach { alerta ->
                 key(alerta.id) {
-                    AlertaDeslizable(alerta) { estado.alertas.remove(alerta) }
+                    AlertaDeslizable(
+                        alerta,
+                        onClick = { abierta = alerta },
+                        onBorrar = { estado.alertas.remove(alerta) }
+                    )
                 }
             }
         }
+    }
+
+    abierta?.let { alerta ->
+        HojaDetalleAlerta(
+            alerta = alerta,
+            onCerrar = { abierta = null },
+            onAccion = { accion ->
+                abierta = null
+                onAccion(accion)
+            },
+            onBorrar = {
+                estado.alertas.remove(alerta)
+                abierta = null
+            }
+        )
     }
 
     if (confirmarBorrado) {
@@ -115,16 +153,78 @@ fun PantallaAlertas(estado: EstadoSistema) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HojaDetalleAlerta(
+    alerta: Alerta,
+    onCerrar: () -> Unit,
+    onAccion: (AccionAlerta) -> Unit,
+    onBorrar: () -> Unit
+) {
+    val color = alerta.tono.color()
+    ModalBottomSheet(onDismissRequest = onCerrar, containerColor = Superficie) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 28.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(color.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center
+                ) { Icon(alerta.icono, null, tint = color) }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(alerta.titulo, style = MaterialTheme.typography.titleLarge, color = color)
+                    Text(
+                        fechaCompleta(alerta.ts),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextoSecundario
+                    )
+                }
+            }
+
+            Text(alerta.mensaje, style = MaterialTheme.typography.bodyLarge)
+
+            alerta.consejo?.let {
+                TarjetaVidrio(
+                    modifier = Modifier.fillMaxWidth(),
+                    colorBorde = color.copy(alpha = 0.4f)
+                ) {
+                    Text("Qué puedes hacer", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(4.dp))
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = TextoSecundario)
+                }
+            }
+
+            alerta.accion?.let { accion ->
+                Button(
+                    onClick = { onAccion(accion) },
+                    colors = ButtonDefaults.buttonColors(containerColor = Menta, contentColor = Fondo),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth().height(52.dp)
+                ) { Text(accion.etiqueta, style = MaterialTheme.typography.titleMedium) }
+            }
+
+            TextButton(onClick = onBorrar, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                Text("Borrar esta alerta", color = Peligro)
+            }
+        }
+    }
+}
+
 @Composable
 fun EstadoVacio() {
     Column(
         modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(
-            Icons.Filled.NotificationsNone, null,
-            tint = Menta, modifier = Modifier.size(64.dp)
-        )
+        Icon(Icons.Filled.NotificationsNone, null, tint = Menta, modifier = Modifier.size(64.dp))
         Spacer(Modifier.height(12.dp))
         Text("Sin alertas", style = MaterialTheme.typography.titleLarge)
         Text(
@@ -139,7 +239,7 @@ fun EstadoVacio() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AlertaDeslizable(alerta: Alerta, onBorrar: () -> Unit) {
+fun AlertaDeslizable(alerta: Alerta, onClick: () -> Unit, onBorrar: () -> Unit) {
     val estadoDeslizar = rememberSwipeToDismissBoxState(
         confirmValueChange = { valor ->
             if (valor != SwipeToDismissBoxValue.Settled) {
@@ -168,7 +268,7 @@ fun AlertaDeslizable(alerta: Alerta, onBorrar: () -> Unit) {
                     Icon(Icons.Filled.Delete, "Borrar", tint = Peligro)
             }
         }
-    ) { TarjetaAlerta(alerta) }
+    ) { TarjetaAlerta(alerta, onClick) }
 }
 
 @Composable
@@ -190,14 +290,15 @@ fun ChipFiltro(texto: String, activo: Boolean, modifier: Modifier = Modifier, on
 }
 
 @Composable
-fun TarjetaAlerta(alerta: Alerta) {
+fun TarjetaAlerta(alerta: Alerta, onClick: (() -> Unit)? = null) {
     val color = alerta.tono.color()
     TarjetaVidrio(
         modifier = Modifier.fillMaxWidth(),
         colorBorde = color.copy(alpha = 0.55f),
         fondo = Brush.verticalGradient(
             listOf(color.copy(alpha = 0.20f), color.copy(alpha = 0.06f))
-        )
+        ),
+        onClick = onClick
     ) {
         Row(verticalAlignment = Alignment.Top) {
             Icon(alerta.icono, null, tint = color, modifier = Modifier.size(32.dp))
@@ -212,13 +313,13 @@ fun TarjetaAlerta(alerta: Alerta) {
                         modifier = Modifier.weight(1f)
                     )
                     Text(
-                        alerta.tiempo,
+                        formatoFecha(alerta.ts),
                         style = MaterialTheme.typography.bodyMedium,
                         color = TextoSecundario
                     )
                 }
                 Spacer(Modifier.height(4.dp))
-                Text(alerta.mensaje, style = MaterialTheme.typography.bodyMedium)
+                Text(alerta.mensaje, style = MaterialTheme.typography.bodyMedium, maxLines = 3)
             }
         }
     }

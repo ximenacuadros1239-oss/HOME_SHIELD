@@ -182,7 +182,16 @@ fun AppPrincipal(estado: EstadoSistema) {
                 composable("control") {
                     PantallaControl(estado) { id -> navController.navigate("dispositivo/$id") }
                 }
-                composable("alertas") { PantallaAlertas(estado) }
+                composable("alertas") {
+                    PantallaAlertas(estado) { accion ->
+                        when (accion) {
+                            AccionAlerta.VER_CONSUMO -> irAPestana("consumo")
+                            AccionAlerta.VER_CONTROL -> irAPestana("control")
+                            AccionAlerta.IR_AJUSTES -> irAPestana("ajustes")
+                            AccionAlerta.VER_TABLERO -> navController.navigate("sensor/tablero")
+                        }
+                    }
+                }
                 composable("cuenta") {
                     PantallaCuenta(estado) { navController.popBackStack() }
                 }

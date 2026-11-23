@@ -279,7 +279,7 @@ fun TarjetaUltimaAlerta(estado: EstadoSistema, onVerAlertas: () -> Unit) {
             Spacer(Modifier.width(8.dp))
             Text("Última alerta", style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f))
-            Text(ultima?.tiempo ?: "", style = MaterialTheme.typography.bodyMedium,
+            Text(ultima?.let { formatoFecha(it.ts) } ?: "", style = MaterialTheme.typography.bodyMedium,
                 color = TextoSecundario)
         }
         Spacer(Modifier.height(10.dp))

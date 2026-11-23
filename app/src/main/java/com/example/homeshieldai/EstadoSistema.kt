@@ -139,10 +139,13 @@ class EstadoSistema : ViewModel() {
     var alAlerta: ((String, String, Tono) -> Unit)? = null
 
     val alertas = mutableStateListOf<Alerta>().apply {
+        val ahoraMs = System.currentTimeMillis()
+        val t1 = ahoraMs - 2 * 3_600_000L
+        val t2 = ahoraMs - 16 * 3_600_000L
         add(Alerta("Sistema normal", "Las mediciones están dentro de los rangos que configuraste.",
-            "Hoy, 08:10", Categoria.GENERAL, Tono.NORMAL, Icons.Filled.CheckCircle))
+            formatoFecha(t1), Categoria.GENERAL, Tono.NORMAL, Icons.Filled.CheckCircle, ts = t1))
         add(Alerta("Conexión restablecida", "El dispositivo volvió a conectarse correctamente.",
-            "Ayer, 18:30", Categoria.GENERAL, Tono.INFO, Icons.Filled.Info))
+            formatoFecha(t2), Categoria.GENERAL, Tono.INFO, Icons.Filled.Info, ts = t2))
     }
 
     private fun agregarAlerta(
@@ -151,11 +154,15 @@ class EstadoSistema : ViewModel() {
         categoria: Categoria,
         tono: Tono,
         icono: ImageVector,
-        notificar: Boolean = false
+        notificar: Boolean = false,
+        accion: AccionAlerta? = null,
+        consejo: String? = null
     ) {
+        val ts = System.currentTimeMillis()
         alertas.add(
             0,
-            Alerta(titulo, mensaje, formatoFecha(System.currentTimeMillis()), categoria, tono, icono)
+            Alerta(titulo, mensaje, formatoFecha(ts), categoria, tono, icono,
+                ts = ts, accion = accion, consejo = consejo)
         )
         if (notificar && notificaciones) alAlerta?.invoke(titulo, mensaje, tono)
     }
@@ -210,10 +217,12 @@ class EstadoSistema : ViewModel() {
             alertaTempActiva = true
             agregarAlerta(
                 "Temperatura alta en el tablero",
-                "El tablero eléctrico llegó a %.1f °C y tu límite es de %.0f °C. Revisa que tenga buena ventilación."
+                "El tablero eléctrico llegó a %.1f °C y tu límite es de %.0f °C."
                     .format(Locale.US, tempTablero, tempAlerta),
                 Categoria.TEMPERATURA, Tono.PRECAUCION, Icons.Filled.Thermostat,
-                notificar = avisoTemperatura
+                notificar = avisoTemperatura,
+                accion = AccionAlerta.VER_TABLERO,
+                consejo = "Mejora la ventilación del tablero, evita encender varios aparatos de alto consumo a la vez y revisa que no haya cables calientes. Si sigue subiendo, apaga lo que no necesites."
             )
         } else if (tempTablero < tempAlerta - 2f) {
             alertaTempActiva = false
@@ -224,16 +233,18 @@ class EstadoSistema : ViewModel() {
         if (presupuesto <= 0f) return
         val gastado = gastoMes
         val razon = gastado / presupuesto
+        val consejo = "Apaga los aparatos que no estés usando, programa un temporizador en los de alto consumo o ajusta tu presupuesto si te quedó corto."
 
         if (razon >= 1f && !avisoPres100) {
             avisoPres100 = true
             avisoPres80 = true
             agregarAlerta(
                 "Superaste tu presupuesto",
-                "Este mes ya gastaste S/ %.2f y tu presupuesto era de S/ %.2f (S/ %.2f de más). Revisa qué aparatos puedes apagar."
+                "Este mes ya gastaste S/ %.2f y tu presupuesto era de S/ %.2f (S/ %.2f de más)."
                     .format(Locale.US, gastado, presupuesto, gastado - presupuesto),
                 Categoria.ELECTRICA, Tono.PRECAUCION, Icons.Filled.Bolt,
-                notificar = avisoPresupuesto
+                notificar = avisoPresupuesto,
+                accion = AccionAlerta.VER_CONSUMO, consejo = consejo
             )
         } else if (razon >= 0.8f && razon < 1f && !avisoPres80) {
             avisoPres80 = true
@@ -242,7 +253,8 @@ class EstadoSistema : ViewModel() {
                 "Llevas gastados S/ %.2f de S/ %.2f este mes. Te quedan S/ %.2f."
                     .format(Locale.US, gastado, presupuesto, presupuesto - gastado),
                 Categoria.ELECTRICA, Tono.PRECAUCION, Icons.Filled.Bolt,
-                notificar = avisoPresupuesto
+                notificar = avisoPresupuesto,
+                accion = AccionAlerta.VER_CONSUMO, consejo = consejo
             )
         }
         if (razon < 0.75f) avisoPres80 = false
@@ -367,7 +379,9 @@ class EstadoSistema : ViewModel() {
             "Dispositivo nuevo detectado",
             "Tu módulo detectó un dispositivo nuevo. Dile qué aparato es para poder usarlo.",
             Categoria.GENERAL, Tono.INFO, Icons.Filled.Info,
-            notificar = true
+            notificar = true,
+            accion = AccionAlerta.VER_CONTROL,
+            consejo = "Entra a Control, toca el dispositivo nuevo y elige qué aparato es."
         )
     }
 
@@ -384,10 +398,12 @@ class EstadoSistema : ViewModel() {
             potencia = 0f
             agregarAlerta(
                 "Posible cortocircuito",
-                "Se detectó una corriente de %.0f A, mayor al límite de %.0f A. Se cortó la energía de tus dispositivos para evitar un incendio. Revisa tus aparatos antes de rearmar."
+                "Se detectó una corriente de %.0f A, mayor al límite de %.0f A. Se cortó la energía de tus dispositivos para evitar un incendio."
                     .format(Locale.US, nuevaCorriente, limiteCorriente),
                 Categoria.ELECTRICA, Tono.PELIGRO, Icons.Filled.Bolt,
-                notificar = true
+                notificar = true,
+                accion = AccionAlerta.IR_AJUSTES,
+                consejo = "Desconecta los aparatos que estaban encendidos y revisa que no tengan cables dañados o recalentados. Cuando estés seguro, ve a Ajustes → Seguridad → Rearmar sistema."
             )
         } else if (!emergencia) {
             corriente = nuevaCorriente
