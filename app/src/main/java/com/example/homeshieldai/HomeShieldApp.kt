@@ -165,7 +165,8 @@ fun AppPrincipal(estado: EstadoSistema) {
                         onVerAlertas = { irAPestana("alertas") },
                         onCuenta = { navController.navigate("cuenta") },
                         onSensor = { id -> navController.navigate("sensor/$id") },
-                        onControl = { irAPestana("control") }
+                        onControl = { irAPestana("control") },
+                        onConsumo = { irAPestana("consumo") }
                     )
                 }
                 composable("consumo") { PantallaConsumo(estado) }

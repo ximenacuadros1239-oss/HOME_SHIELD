@@ -26,7 +26,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.homeshieldai.ui.theme.*
+import java.util.Calendar
 import java.util.Locale
+
+private fun saludoSegunHora(): String {
+    val h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    return when {
+        h < 12 -> "Buenos días"
+        h < 19 -> "Buenas tardes"
+        else -> "Buenas noches"
+    }
+}
 
 @Composable
 fun PantallaInicio(
@@ -34,14 +44,17 @@ fun PantallaInicio(
     onVerAlertas: () -> Unit,
     onCuenta: () -> Unit,
     onSensor: (String) -> Unit,
-    onControl: () -> Unit
+    onControl: () -> Unit,
+    onConsumo: () -> Unit
 ) {
+    var verEstado by remember { mutableStateOf(false) }
     val (textoSala, colorSala) = estadoTemp(estado.tempSala, estado.tempAlerta)
     val (textoTablero, colorTablero) = estadoTemp(estado.tempTablero, estado.tempAlerta)
     val hayAvisos = estado.emergencia ||
             estado.alertas.take(3).any { it.tono == Tono.PELIGRO || it.tono == Tono.PRECAUCION }
-
-    var verEstado by remember { mutableStateOf(false) }
+    val primerNombre = estado.nombre.substringBefore(" ")
+    val saludo = if (primerNombre.isBlank()) saludoSegunHora()
+    else "${saludoSegunHora()}, $primerNombre"
 
     Column(
         modifier = Modifier
@@ -51,8 +64,12 @@ fun PantallaInicio(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Encabezado(
-            estado.nombre.take(1).uppercase().ifBlank { "?" },
-            hayAvisos, onVerAlertas, onCuenta
+            inicial = estado.nombre.take(1).uppercase().ifBlank { "?" },
+            saludo = saludo,
+            hogar = estado.nombreHogar,
+            hayAvisos = hayAvisos,
+            onAlertas = onVerAlertas,
+            onCuenta = onCuenta
         )
         TarjetaProtegida(estado.emergencia, estado.dispositivoConectado) { verEstado = true }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -75,15 +92,19 @@ fun PantallaInicio(
                 "S/ %.2f".format(Locale.US, estado.gastoHoy), Modifier.weight(1f)
             )
         }
+        TarjetaPresupuesto(estado, onConsumo)
         TarjetaDispositivos(estado, onControl)
         TarjetaUltimaAlerta(estado, onVerAlertas)
     }
+
     if (verEstado) HojaEstadoSistema(estado) { verEstado = false }
 }
 
 @Composable
 fun Encabezado(
     inicial: String,
+    saludo: String,
+    hogar: String,
     hayAvisos: Boolean,
     onAlertas: () -> Unit,
     onCuenta: () -> Unit
@@ -92,11 +113,18 @@ fun Encabezado(
         Icon(Icons.Filled.Home, null, tint = Menta, modifier = Modifier.size(38.dp))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text("Home Shield AI", style = MaterialTheme.typography.titleLarge)
             Text(
-                "Tu hogar más seguro, siempre.",
+                saludo,
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                hogar,
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextoSecundario
+                color = TextoSecundario,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
         IconButton(onClick = onAlertas) {
@@ -171,7 +199,7 @@ fun TarjetaProtegida(emergencia: Boolean, conectado: Boolean, onClick: () -> Uni
                 EstadoPunto(
                     when {
                         emergencia -> "Relé apagado por seguridad"
-                        sinConexion -> "Revisa el Wi-Fi del ESP32"
+                        sinConexion -> "Revisa el Wi-Fi del módulo"
                         else -> "Todo en orden"
                     },
                     if (emergencia) TextoPrincipal else color
@@ -234,8 +262,75 @@ fun TarjetaDato(
 }
 
 @Composable
+fun BarraProgreso(progreso: Float, color: Color) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(8.dp)
+            .clip(RoundedCornerShape(50))
+            .background(SuperficieAlta)
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth(progreso.coerceIn(0f, 1f))
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(50))
+                .background(color)
+        )
+    }
+}
+
+@Composable
+fun TarjetaPresupuesto(estado: EstadoSistema, onClick: () -> Unit) {
+    val gastado = estado.gastoMes
+    val limite = estado.presupuesto
+    val razon = if (limite > 0f) gastado / limite else 0f
+    val color = when {
+        razon >= 1f -> Peligro
+        razon >= 0.8f -> Ambar
+        else -> Menta
+    }
+    val restante = limite - gastado
+
+    TarjetaVidrio(
+        modifier = Modifier.fillMaxWidth(),
+        colorBorde = if (razon >= 0.8f) color.copy(alpha = 0.5f) else Borde,
+        onClick = onClick
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.AccountBalanceWallet, null, tint = color)
+            Spacer(Modifier.width(8.dp))
+            Text("Presupuesto del mes", style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f))
+            Text(
+                "%.0f %%".format(Locale.US, razon * 100),
+                style = MaterialTheme.typography.titleMedium, color = color
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        BarraProgreso(razon, color)
+        Spacer(Modifier.height(8.dp))
+        Row {
+            Text(
+                "S/ %.2f de S/ %.0f".format(Locale.US, gastado, limite),
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextoSecundario,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                if (restante >= 0) "Te quedan S/ %.2f".format(Locale.US, restante)
+                else "Te pasaste S/ %.2f".format(Locale.US, -restante),
+                style = MaterialTheme.typography.bodyMedium,
+                color = color
+            )
+        }
+    }
+}
+
+@Composable
 fun TarjetaDispositivos(estado: EstadoSistema, onControl: () -> Unit) {
-    val encendidos = estado.dispositivos.count { it.encendido }
+    val listos = estado.dispositivos.filter { it.configurado }
+    val encendidos = listos.filter { it.encendido }
     TarjetaVidrio(modifier = Modifier.fillMaxWidth(), onClick = onControl) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -253,14 +348,27 @@ fun TarjetaDispositivos(estado: EstadoSistema, onControl: () -> Unit) {
                 when {
                     estado.emergencia -> EstadoPunto("Bloqueados por seguridad", Peligro)
                     !estado.dispositivoConectado ->
-                        EstadoPunto("Sin conexión con el dispositivo", TextoSecundario)
-                    else -> EstadoPunto(
-                        "$encendidos de ${estado.dispositivos.size} encendidos",
-                        if (encendidos > 0) Menta else TextoSecundario
-                    )
+                        EstadoPunto("Sin conexión con el módulo", TextoSecundario)
+                    listos.isEmpty() ->
+                        EstadoPunto("Aún no se detecta ninguno", TextoSecundario)
+                    else -> {
+                        EstadoPunto(
+                            "${encendidos.size} de ${listos.size} encendidos",
+                            if (encendidos.isNotEmpty()) Menta else TextoSecundario
+                        )
+                        if (encendidos.isNotEmpty()) {
+                            Text(
+                                encendidos.joinToString(", ") { it.nombre },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextoSecundario,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                 }
             }
-            if (encendidos > 0 && !estado.emergencia && estado.dispositivoConectado) {
+            if (encendidos.isNotEmpty() && !estado.emergencia && estado.dispositivoConectado) {
                 TextButton(onClick = { estado.apagarTodo() }) {
                     Text("Apagar todo", color = Peligro)
                 }
@@ -279,8 +387,11 @@ fun TarjetaUltimaAlerta(estado: EstadoSistema, onVerAlertas: () -> Unit) {
             Spacer(Modifier.width(8.dp))
             Text("Última alerta", style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f))
-            Text(ultima?.let { formatoFecha(it.ts) } ?: "", style = MaterialTheme.typography.bodyMedium,
-                color = TextoSecundario)
+            Text(
+                ultima?.let { formatoFecha(it.ts) } ?: "",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextoSecundario
+            )
         }
         Spacer(Modifier.height(10.dp))
         if (ultima == null) {
@@ -316,12 +427,14 @@ fun TarjetaUltimaAlerta(estado: EstadoSistema, onVerAlertas: () -> Unit) {
         }
     }
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HojaEstadoSistema(estado: EstadoSistema, onCerrar: () -> Unit) {
     val (textoSala, colorSala) = estadoTemp(estado.tempSala, estado.tempAlerta)
     val (textoTablero, colorTablero) = estadoTemp(estado.tempTablero, estado.tempAlerta)
-    val encendidos = estado.dispositivos.count { it.encendido }
+    val listos = estado.dispositivos.filter { it.configurado }
+    val encendidos = listos.count { it.encendido }
 
     ModalBottomSheet(onDismissRequest = onCerrar, containerColor = Superficie) {
         Column(
@@ -332,7 +445,7 @@ fun HojaEstadoSistema(estado: EstadoSistema, onCerrar: () -> Unit) {
             Text(
                 when {
                     estado.emergencia -> "Hubo un corte de emergencia. Rearma el sistema en Ajustes."
-                    !estado.dispositivoConectado -> "No llegan lecturas del dispositivo."
+                    !estado.dispositivoConectado -> "No llegan lecturas del módulo."
                     else -> "Todo funciona con normalidad."
                 },
                 style = MaterialTheme.typography.bodyMedium,
@@ -340,7 +453,7 @@ fun HojaEstadoSistema(estado: EstadoSistema, onCerrar: () -> Unit) {
             )
             Spacer(Modifier.height(10.dp))
             FilaEstado(
-                Icons.Filled.Wifi, "Conexión con el dispositivo",
+                Icons.Filled.Wifi, "Conexión con el módulo",
                 if (estado.dispositivoConectado) "Conectado" else "Sin conexión",
                 if (estado.dispositivoConectado) Menta else Ambar
             )
@@ -359,7 +472,7 @@ fun HojaEstadoSistema(estado: EstadoSistema, onCerrar: () -> Unit) {
             )
             FilaEstado(
                 Icons.Filled.Power, "Dispositivos",
-                "$encendidos de ${estado.dispositivos.size} encendidos",
+                "$encendidos de ${listos.size} encendidos",
                 if (estado.emergencia) Peligro else Menta
             )
         }
