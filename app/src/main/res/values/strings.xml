@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Home Shield</string>
+    <string name="widget_descripcion">Estado de tu casa, consumo y gasto de un vistazo</string>
 </resources>
