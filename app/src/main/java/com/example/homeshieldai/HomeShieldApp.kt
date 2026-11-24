@@ -46,6 +46,9 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.glance.appwidget.updateAll
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 
 data class Destino(val ruta: String, val titulo: String, val icono: ImageVector)
 
@@ -103,6 +106,11 @@ fun AppPrincipal(estado: EstadoSistema) {
         ActivityResultContracts.RequestPermission()
     ) { }
 
+    val haptic = LocalHapticFeedback.current
+    LaunchedEffect(estado.emergencia) {
+        if (estado.emergencia) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
+
     LaunchedEffect(Unit) {
         val appContext = context.applicationContext
         crearCanalesNotificacion(appContext)
@@ -115,8 +123,27 @@ fun AppPrincipal(estado: EstadoSistema) {
     }
 
     LaunchedEffect(Unit) {
+        val appContext = context.applicationContext
+        var ultimoEstado = -1
+        var ultimaActualizacion = 0L
         while (true) {
             estado.tick()
+            val codigo = when {
+                estado.emergencia -> 2
+                !estado.dispositivoConectado -> 1
+                else -> 0
+            }
+            val ahoraMs = System.currentTimeMillis()
+            if (codigo != ultimoEstado || ahoraMs - ultimaActualizacion > 30_000L) {
+                guardarDatosWidget(
+                    appContext,
+                    DatosWidget(codigo, estado.potencia, estado.gastoHoy,
+                        estado.tempTablero, estado.nombreHogar, ahoraMs)
+                )
+                HomeShieldWidget().updateAll(appContext)
+                ultimoEstado = codigo
+                ultimaActualizacion = ahoraMs
+            }
             delay(2000)
         }
     }

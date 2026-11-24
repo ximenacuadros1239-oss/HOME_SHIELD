@@ -25,6 +25,11 @@ import androidx.compose.ui.unit.dp
 import com.example.homeshieldai.ui.theme.*
 import java.util.Locale
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+
 
 @Composable
 fun PantallaAjustes(estado: EstadoSistema, onCuenta: () -> Unit, onTarifa: () -> Unit) {
@@ -205,6 +210,20 @@ fun PantallaAjustes(estado: EstadoSistema, onCuenta: () -> Unit, onTarifa: () ->
             )
             Spacer(Modifier.height(6.dp))
             SelectorTema(estado.modoTema) { estado.cambiarTema(it) }
+            Spacer(Modifier.height(6.dp))
+            FilaAjuste(
+                Icons.Filled.Widgets, "Widget en la pantalla de inicio",
+                detalle = "Mira el estado de tu casa sin abrir la app",
+                onClick = {
+                    val gestor = android.appwidget.AppWidgetManager.getInstance(context)
+                    if (gestor.isRequestPinAppWidgetSupported) {
+                        gestor.requestPinAppWidget(
+                            android.content.ComponentName(context, HomeShieldWidgetReceiver::class.java),
+                            null, null
+                        )
+                    }
+                }
+            )
         }
 
         // ---------- Dispositivo ----------
@@ -251,14 +270,14 @@ fun PantallaAjustes(estado: EstadoSistema, onCuenta: () -> Unit, onTarifa: () ->
                         detalle = if (estado.dispositivoConectado) "Deja de recibir lecturas"
                         else "Volver a conectar",
                         colorIcono = Ambar, onClick = { estado.alternarConexion() })
+                    DivisorAjuste()
+                    FilaAjuste(
+                        Icons.Filled.AddCircle, "Simular dispositivo nuevo",
+                        detalle = "Como cuando el módulo detecta uno",
+                        onClick = { estado.simularDispositivoNuevo() }
+                    )
                 }
             }
-            DivisorAjuste()
-            FilaAjuste(
-                Icons.Filled.AddCircle, "Simular dispositivo nuevo",
-                detalle = "Como cuando el módulo detecta uno",
-                onClick = { estado.simularDispositivoNuevo() }
-            )
         }
 
         TarjetaVidrio(
@@ -329,7 +348,9 @@ fun TituloSeccion(texto: String) {
         texto,
         style = MaterialTheme.typography.titleMedium,
         color = TextoSecundario,
-        modifier = Modifier.padding(start = 4.dp, top = 6.dp)
+        modifier = Modifier
+            .padding(start = 4.dp, top = 6.dp)
+            .semantics { heading() }
     )
 }
 
@@ -358,7 +379,7 @@ fun FilaAjuste(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button) { onClick() } else Modifier)
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -398,23 +419,30 @@ fun FilaSwitch(
     habilitado: Boolean = true,
     onCambio: (Boolean) -> Unit
 ) {
-    FilaAjuste(
-        icono, titulo, detalle,
-        colorIcono = if (habilitado) Menta else TextoSecundario,
-        trailing = {
-            Switch(
-                checked = checked,
-                onCheckedChange = onCambio,
-                enabled = habilitado,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = TextoPrincipal,
-                    checkedTrackColor = Menta,
-                    uncheckedThumbColor = TextoSecundario,
-                    uncheckedTrackColor = SuperficieAlta
+    Box(
+        Modifier.toggleable(
+            value = checked, enabled = habilitado,
+            role = Role.Switch, onValueChange = onCambio
+        )
+    ) {
+        FilaAjuste(
+            icono, titulo, detalle,
+            colorIcono = if (habilitado) Menta else TextoSecundario,
+            trailing = {
+                Switch(
+                    checked = checked,
+                    onCheckedChange = null,
+                    enabled = habilitado,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = TextoPrincipal,
+                        checkedTrackColor = Menta,
+                        uncheckedThumbColor = TextoSecundario,
+                        uncheckedTrackColor = SuperficieAlta
+                    )
                 )
-            )
-        }
-    )
+            }
+        )
+    }
 }
 
 @Composable

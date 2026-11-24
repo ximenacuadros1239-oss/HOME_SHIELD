@@ -16,6 +16,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.homeshieldai.ui.theme.*
+import androidx.compose.ui.semantics.Role
+
 
 @Composable
 fun TarjetaVidrio(
@@ -31,7 +33,7 @@ fun TarjetaVidrio(
             .clip(forma)
             .background(fondo)
             .border(1.dp, colorBorde, forma)
-            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button) { onClick() } else Modifier)
             .padding(14.dp),
         content = content
     )
