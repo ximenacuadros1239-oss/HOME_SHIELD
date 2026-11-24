@@ -18,11 +18,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.homeshieldai.ui.theme.*
 import java.util.Locale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 
 @Composable
 fun PantallaControl(estado: EstadoSistema, onAbrir: (Int) -> Unit) {
@@ -253,6 +257,7 @@ fun FilaDispositivo(
     onAbrir: () -> Unit,
     onCambio: (Boolean) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     TarjetaVidrio(
         modifier = Modifier.fillMaxWidth(),
         colorBorde = if (d.encendido) Menta.copy(alpha = 0.5f) else Borde,
@@ -297,9 +302,13 @@ fun FilaDispositivo(
             }
             Switch(
                 checked = d.encendido,
-                onCheckedChange = onCambio,
+                onCheckedChange = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onCambio(it)
+                },
                 enabled = !bloqueado,
-                colors = coloresSwitch()
+                colors = coloresSwitch(),
+                modifier = Modifier.semantics { contentDescription = "Encender o apagar ${d.nombre}" }
             )
         }
     }

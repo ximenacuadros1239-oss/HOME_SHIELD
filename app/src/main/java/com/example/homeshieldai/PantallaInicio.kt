@@ -28,6 +28,9 @@ import androidx.compose.ui.unit.dp
 import com.example.homeshieldai.ui.theme.*
 import java.util.Calendar
 import java.util.Locale
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
 
 private fun saludoSegunHora(): String {
     val h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
@@ -63,38 +66,45 @@ fun PantallaInicio(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Encabezado(
-            inicial = estado.nombre.take(1).uppercase().ifBlank { "?" },
-            saludo = saludo,
-            hogar = estado.nombreHogar,
-            hayAvisos = hayAvisos,
-            onAlertas = onVerAlertas,
-            onCuenta = onCuenta
-        )
-        TarjetaProtegida(estado.emergencia, estado.dispositivoConectado) { verEstado = true }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            TarjetaSensor(
-                "Sala", "%.1f °C".format(Locale.US, estado.tempSala),
-                textoSala, colorSala, Modifier.weight(1f)
-            ) { onSensor("sala") }
-            TarjetaSensor(
-                "Tablero", "%.1f °C".format(Locale.US, estado.tempTablero),
-                textoTablero, colorTablero, Modifier.weight(1f)
-            ) { onSensor("tablero") }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            TarjetaDato(
-                Icons.Filled.Bolt, "Consumo en vivo",
-                "%.0f W".format(Locale.US, estado.potencia), Modifier.weight(1f)
-            ) { onSensor("consumo") }
-            TarjetaDato(
-                Icons.Filled.Payments, "Gasto de hoy",
-                "S/ %.2f".format(Locale.US, estado.gastoHoy), Modifier.weight(1f)
+        Box(Modifier.fillMaxWidth().aparecer(0)) {
+            Encabezado(
+                inicial = estado.nombre.take(1).uppercase().ifBlank { "?" },
+                saludo = saludo, hogar = estado.nombreHogar, hayAvisos = hayAvisos,
+                onAlertas = onVerAlertas, onCuenta = onCuenta
             )
         }
-        TarjetaPresupuesto(estado, onConsumo)
-        TarjetaDispositivos(estado, onControl)
-        TarjetaUltimaAlerta(estado, onVerAlertas)
+        Box(Modifier.fillMaxWidth().aparecer(1)) {
+            TarjetaProtegida(estado.emergencia, estado.dispositivoConectado) { verEstado = true }
+        }
+        Box(Modifier.fillMaxWidth().aparecer(2)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TarjetaSensor(
+                    "Sala", "%.1f °C".format(Locale.US, estado.tempSala),
+                    textoSala, colorSala, Modifier.weight(1f)
+                ) { onSensor("sala") }
+                TarjetaSensor(
+                    "Tablero", "%.1f °C".format(Locale.US, estado.tempTablero),
+                    textoTablero, colorTablero, Modifier.weight(1f)
+                ) { onSensor("tablero") }
+            }
+        }
+        Box(Modifier.fillMaxWidth().aparecer(3)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TarjetaDato(
+                    Icons.Filled.Bolt, "Consumo en vivo", "",
+                    Modifier.weight(1f),
+                    numero = estado.potencia, formato = { "%.0f W".format(Locale.US, it) }
+                ) { onSensor("consumo") }
+                TarjetaDato(
+                    Icons.Filled.Payments, "Gasto de hoy", "",
+                    Modifier.weight(1f),
+                    numero = estado.gastoHoy, formato = { "S/ %.2f".format(Locale.US, it) }
+                )
+            }
+        }
+        Box(Modifier.fillMaxWidth().aparecer(4)) { TarjetaPresupuesto(estado, onConsumo) }
+        Box(Modifier.fillMaxWidth().aparecer(5)) { TarjetaDispositivos(estado, onControl) }
+        Box(Modifier.fillMaxWidth().aparecer(6)) { TarjetaUltimaAlerta(estado, onVerAlertas) }
     }
 
     if (verEstado) HojaEstadoSistema(estado) { verEstado = false }
@@ -138,7 +148,7 @@ fun Encabezado(
                 .size(38.dp)
                 .clip(CircleShape)
                 .background(MentaOscuro)
-                .clickable { onCuenta() },
+                .clickable(onClickLabel = "Abrir mi cuenta", role = Role.Button) { onCuenta() },
             contentAlignment = Alignment.Center
         ) {
             Text(inicial, style = MaterialTheme.typography.titleMedium)
@@ -160,6 +170,15 @@ fun TarjetaProtegida(emergencia: Boolean, conectado: Boolean, onClick: () -> Uni
         targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(800), RepeatMode.Reverse),
         label = "alfa"
+    )
+    val activas = animacionesActivas()
+    val latido by pulso.animateFloat(
+        initialValue = 1f,
+        targetValue = if (!activas) 1f else if (emergencia) 1.12f else 1.05f,
+        animationSpec = infiniteRepeatable(
+            tween(if (emergencia) 500 else 1600), RepeatMode.Reverse
+        ),
+        label = "latido"
     )
     val borde = if (emergencia) Peligro.copy(alpha = alfa) else color.copy(alpha = 0.6f)
 
@@ -183,7 +202,9 @@ fun TarjetaProtegida(emergencia: Boolean, conectado: Boolean, onClick: () -> Uni
                     sinConexion -> Icons.Filled.CloudOff
                     else -> Icons.Filled.VerifiedUser
                 },
-                null, tint = TextoPrincipal, modifier = Modifier.size(56.dp)
+                null, tint = TextoPrincipal, modifier = Modifier
+                    .size(56.dp)
+                    .graphicsLayer { scaleX = latido; scaleY = latido }
             )
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
@@ -244,6 +265,8 @@ fun TarjetaDato(
     titulo: String,
     valor: String,
     modifier: Modifier = Modifier,
+    numero: Float? = null,
+    formato: (Float) -> String = { "%.0f".format(Locale.US, it) },
     onClick: (() -> Unit)? = null
 ) {
     TarjetaVidrio(modifier = modifier, onClick = onClick) {
@@ -257,12 +280,17 @@ fun TarjetaDato(
             }
         }
         Spacer(Modifier.height(8.dp))
-        Text(valor, style = MaterialTheme.typography.headlineMedium)
+        if (numero != null) {
+            NumeroAnimado(numero, formato, MaterialTheme.typography.headlineMedium)
+        } else {
+            Text(valor, style = MaterialTheme.typography.headlineMedium)
+        }
     }
 }
 
 @Composable
 fun BarraProgreso(progreso: Float, color: Color) {
+    val p by animateFloatAsState(progreso.coerceIn(0f, 1f), tween(700), label = "barra")
     Box(
         Modifier
             .fillMaxWidth()
@@ -272,7 +300,7 @@ fun BarraProgreso(progreso: Float, color: Color) {
     ) {
         Box(
             Modifier
-                .fillMaxWidth(progreso.coerceIn(0f, 1f))
+                .fillMaxWidth(p)
                 .fillMaxHeight()
                 .clip(RoundedCornerShape(50))
                 .background(color)
