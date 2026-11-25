@@ -100,18 +100,14 @@ fun PantallaAlertas(estado: EstadoSistema, onAccion: (AccionAlerta) -> Unit) {
             EstadoVacio()
         } else {
             Text(
-                "Toca una alerta para ver el detalle. Desliza para borrarla.",
+                "Toca una alerta para ver el detalle.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextoSecundario,
                 modifier = Modifier.padding(start = 4.dp)
             )
             lista.forEach { alerta ->
                 key(alerta.id) {
-                    AlertaDeslizable(
-                        alerta,
-                        onClick = { abierta = alerta },
-                        onBorrar = { estado.alertas.remove(alerta) }
-                    )
+                    TarjetaAlerta(alerta) { abierta = alerta }
                 }
             }
         }

@@ -2,8 +2,10 @@ package com.example.homeshieldai
 
 import android.Manifest
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -11,6 +13,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Home
@@ -24,31 +28,34 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
-import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.glance.appwidget.updateAll
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.homeshieldai.ui.theme.*
 import kotlinx.coroutines.delay
-import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.glance.appwidget.updateAll
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
+import kotlinx.coroutines.launch
+import kotlin.math.absoluteValue
 
 data class Destino(val ruta: String, val titulo: String, val icono: ImageVector)
 
@@ -95,11 +102,22 @@ fun HomeShieldApp() {
         }
     }
 }
+
+@Composable
+private fun MarcoDetalle(content: @Composable () -> Unit) {
+    val contador = remember { ContadorAparicion() }
+    Scaffold(containerColor = Color.Transparent, contentColor = TextoPrincipal) { padding ->
+        CompositionLocalProvider(LocalContadorAparicion provides contador) {
+            Box(Modifier.padding(padding)) { content() }
+        }
+    }
+}
+
 @Composable
 fun AppPrincipal(estado: EstadoSistema) {
     val navController = rememberNavController()
-    val entradaActual by navController.currentBackStackEntryAsState()
-    val rutaActual = entradaActual?.destination?.route
+    val scope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(pageCount = { destinos.size })
 
     val context = LocalContext.current
     val lanzadorPermiso = rememberLauncherForActivityResult(
@@ -137,8 +155,16 @@ fun AppPrincipal(estado: EstadoSistema) {
             if (codigo != ultimoEstado || ahoraMs - ultimaActualizacion > 30_000L) {
                 guardarDatosWidget(
                     appContext,
-                    DatosWidget(codigo, estado.potencia, estado.gastoHoy,
-                        estado.tempTablero, estado.nombreHogar, ahoraMs)
+                    DatosWidget(
+                        estado = codigo,
+                        potencia = estado.potencia,
+                        gastoHoy = estado.gastoHoy,
+                        tempTablero = estado.tempTablero,
+                        hogar = estado.nombreHogar,
+                        ts = ahoraMs,
+                        gastoMes = estado.gastoMes,
+                        presupuesto = estado.presupuesto
+                    )
                 )
                 HomeShieldWidget().updateAll(appContext)
                 ultimoEstado = codigo
@@ -148,19 +174,8 @@ fun AppPrincipal(estado: EstadoSistema) {
         }
     }
 
-    // Una sola forma de ir a una pestaña: vuelve siempre a Inicio al retroceder
-    fun irAPestana(ruta: String) {
-        navController.navigate(ruta) {
-            popUpTo(navController.graph.findStartDestination().id) { inclusive = false }
-            launchSingleTop = true
-        }
-    }
-
-    val rutaResaltada = when {
-        rutaActual?.startsWith("sensor") == true || rutaActual == "cuenta" -> "inicio"
-        rutaActual?.startsWith("dispositivo") == true -> "control"
-        rutaActual == "tarifa" -> "ajustes"
-        else -> rutaActual
+    fun irAPagina(i: Int) {
+        scope.launch { pagerState.animateScrollToPage(i) }
     }
 
     Box(
@@ -168,74 +183,115 @@ fun AppPrincipal(estado: EstadoSistema) {
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(FondoAlto, Fondo)))
     ) {
-        Scaffold(
-            containerColor = Color.Transparent,
-            contentColor = TextoPrincipal,
-            bottomBar = {
-                BarraInferior(rutaActual = rutaResaltada) { ruta ->
-                    if (ruta != rutaActual) irAPestana(ruta)
-                }
+        NavHost(
+            navController = navController,
+            startDestination = "principal",
+            enterTransition = {
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Left, tween(300)
+                ) + fadeIn(tween(300))
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Left, tween(300),
+                    targetOffset = { it / 4 }
+                ) + fadeOut(tween(300))
+            },
+            popEnterTransition = {
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Right, tween(300),
+                    initialOffset = { it / 4 }
+                ) + fadeIn(tween(300))
+            },
+            popExitTransition = {
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Right, tween(300)
+                ) + fadeOut(tween(300))
             }
-        ) { padding ->
-            NavHost(
-                navController = navController,
-                startDestination = "inicio",
-                modifier = Modifier.padding(padding),
-                enterTransition = { fadeIn(tween(250)) },
-                exitTransition = { fadeOut(tween(150)) },
-                popEnterTransition = { fadeIn(tween(250)) },
-                popExitTransition = { fadeOut(tween(150)) }
-            ) {
-                composable("inicio") {
-                    PantallaInicio(
-                        estado,
-                        onVerAlertas = { irAPestana("alertas") },
-                        onCuenta = { navController.navigate("cuenta") },
-                        onSensor = { id -> navController.navigate("sensor/$id") },
-                        onControl = { irAPestana("control") },
-                        onConsumo = { irAPestana("consumo") }
-                    )
-                }
-                composable("consumo") { PantallaConsumo(estado) }
-                composable("ajustes") {
-                    PantallaAjustes(
-                        estado,
-                        onCuenta = { navController.navigate("cuenta") },
-                        onTarifa = { navController.navigate("tarifa") }
-                    )
-                }
-                composable("tarifa") {
-                    PantallaTarifa(estado) { navController.popBackStack() }
-                }
-                composable("control") {
-                    PantallaControl(estado) { id -> navController.navigate("dispositivo/$id") }
-                }
-                composable("alertas") {
-                    PantallaAlertas(estado) { accion ->
-                        when (accion) {
-                            AccionAlerta.VER_CONSUMO -> irAPestana("consumo")
-                            AccionAlerta.VER_CONTROL -> irAPestana("control")
-                            AccionAlerta.IR_AJUSTES -> irAPestana("ajustes")
-                            AccionAlerta.VER_TABLERO -> navController.navigate("sensor/tablero")
+        ) {
+            composable("principal") {
+                BackHandler(enabled = pagerState.currentPage != 0) { irAPagina(0) }
+                Scaffold(
+                    containerColor = Color.Transparent,
+                    contentColor = TextoPrincipal,
+                    bottomBar = {
+                        BarraInferior(pagerState.currentPage) { irAPagina(it) }
+                    }
+                ) { padding ->
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.padding(padding)
+                    ) { pagina ->
+                        val contador = remember { ContadorAparicion() }
+                        CompositionLocalProvider(LocalContadorAparicion provides contador) {
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        val d = ((pagerState.currentPage - pagina) +
+                                                pagerState.currentPageOffsetFraction)
+                                            .absoluteValue.coerceIn(0f, 1f)
+                                        alpha = 1f - 0.5f * d
+                                        val s = 1f - 0.06f * d
+                                        scaleX = s
+                                        scaleY = s
+                                    }
+                            ) {
+                                when (pagina) {
+                                    0 -> PantallaInicio(
+                                        estado,
+                                        onVerAlertas = { irAPagina(3) },
+                                        onCuenta = { navController.navigate("cuenta") },
+                                        onSensor = { id -> navController.navigate("sensor/$id") },
+                                        onControl = { irAPagina(2) },
+                                        onConsumo = { irAPagina(1) }
+                                    )
+                                    1 -> PantallaConsumo(estado)
+                                    2 -> PantallaControl(estado) { id ->
+                                        navController.navigate("dispositivo/$id")
+                                    }
+                                    3 -> PantallaAlertas(estado) { accion ->
+                                        when (accion) {
+                                            AccionAlerta.VER_CONSUMO -> irAPagina(1)
+                                            AccionAlerta.VER_CONTROL -> irAPagina(2)
+                                            AccionAlerta.IR_AJUSTES -> irAPagina(4)
+                                            AccionAlerta.VER_TABLERO ->
+                                                navController.navigate("sensor/tablero")
+                                        }
+                                    }
+                                    else -> PantallaAjustes(
+                                        estado,
+                                        onCuenta = { navController.navigate("cuenta") },
+                                        onTarifa = { navController.navigate("tarifa") }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
-                composable("cuenta") {
-                    PantallaCuenta(estado) { navController.popBackStack() }
-                }
-                composable(
-                    "sensor/{id}",
-                    arguments = listOf(navArgument("id") { type = NavType.StringType })
-                ) { entrada ->
+            }
+            composable("tarifa") {
+                MarcoDetalle { PantallaTarifa(estado) { navController.popBackStack() } }
+            }
+            composable("cuenta") {
+                MarcoDetalle { PantallaCuenta(estado) { navController.popBackStack() } }
+            }
+            composable(
+                "sensor/{id}",
+                arguments = listOf(navArgument("id") { type = NavType.StringType })
+            ) { entrada ->
+                MarcoDetalle {
                     PantallaSensor(
                         estado,
                         entrada.arguments?.getString("id") ?: "sala"
                     ) { navController.popBackStack() }
                 }
-                composable(
-                    "dispositivo/{id}",
-                    arguments = listOf(navArgument("id") { type = NavType.IntType })
-                ) { entrada ->
+            }
+            composable(
+                "dispositivo/{id}",
+                arguments = listOf(navArgument("id") { type = NavType.IntType })
+            ) { entrada ->
+                MarcoDetalle {
                     PantallaDispositivo(
                         estado,
                         entrada.arguments?.getInt("id") ?: -1
@@ -247,12 +303,12 @@ fun AppPrincipal(estado: EstadoSistema) {
 }
 
 @Composable
-fun BarraInferior(rutaActual: String?, onSeleccionar: (String) -> Unit) {
+fun BarraInferior(seleccionado: Int, onSeleccionar: (Int) -> Unit) {
     NavigationBar(containerColor = Superficie) {
-        destinos.forEach { destino ->
+        destinos.forEachIndexed { i, destino ->
             NavigationBarItem(
-                selected = rutaActual == destino.ruta,
-                onClick = { onSeleccionar(destino.ruta) },
+                selected = seleccionado == i,
+                onClick = { onSeleccionar(i) },
                 icon = { Icon(destino.icono, contentDescription = destino.titulo) },
                 label = { Text(destino.titulo) },
                 colors = NavigationBarItemDefaults.colors(
