@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import kotlinx.coroutines.delay
+import androidx.compose.runtime.compositionLocalOf
 
 /** false si la persona activó «Quitar animaciones» en el sistema. */
 @Composable
@@ -51,4 +52,29 @@ fun NumeroAnimado(
     val activas = animacionesActivas()
     val mostrado by animateFloatAsState(valor, tween(if (activas) 600 else 0), label = "numero")
     Text(formato(mostrado), style = estilo, color = color, modifier = modifier)
+}
+
+class ContadorAparicion {
+    private var n = 0
+    fun siguiente(): Int = n++
+}
+
+val LocalContadorAparicion = compositionLocalOf<ContadorAparicion?> { null }
+
+/** Cada tarjeta aparece sola, una tras otra, según su orden en la pantalla. */
+fun Modifier.aparecerAuto(): Modifier = composed {
+    val contador = LocalContadorAparicion.current
+    val indice = remember { minOf(contador?.siguiente() ?: 0, 6) }
+    val activas = animacionesActivas() && contador != null
+    val progreso = remember { Animatable(if (activas) 0f else 1f) }
+    LaunchedEffect(Unit) {
+        if (activas) {
+            delay(indice * 70L)
+            progreso.animateTo(1f, tween(450))
+        }
+    }
+    graphicsLayer {
+        alpha = progreso.value
+        translationY = (1f - progreso.value) * 36f
+    }
 }

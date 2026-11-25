@@ -30,6 +30,7 @@ fun TarjetaVidrio(
     val forma = RoundedCornerShape(20.dp)
     Column(
         modifier = modifier
+            .aparecerAuto()
             .clip(forma)
             .background(fondo)
             .border(1.dp, colorBorde, forma)
